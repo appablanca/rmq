@@ -7,3 +7,4 @@
 /rmq-haskell/*.hi
 /rmq-haskell/*.o
 /rmq-csharp/*.exe
+venv
