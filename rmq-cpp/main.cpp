@@ -17,14 +17,14 @@
 //   uint64_t query(size_t l, size_t r) const;
 
 // Trivial implementation that computes each query on the fly.
-struct Naive {
-	static std::string name() { return "QuadraticQuery"; }
+struct OnTheFlyNaive {
+	static std::string name() { return "OnTheFlyNaive"; }
 	// NOTE: Improved implementations should simply return size_t::MAX.
 	static size_t max_n() { return 10'000; }
 
 	const std::vector<uint64_t>* data;
 
-	static Naive build(const std::vector<uint64_t>& data) { return {&data}; }
+	static OnTheFlyNaive build(const std::vector<uint64_t>& data) { return {&data}; }
 
 	size_t space() const { return sizeof(*this); }
 
@@ -32,6 +32,44 @@ struct Naive {
 		uint64_t min = (*data)[l];
 		for(size_t i = l + 1; i <= r; ++i) min = std::min(min, (*data)[i]);
 		return min;
+	}
+};
+
+struct PrecomputedNaive {
+	static std::string name() { return "PrecomputedNaive"; }
+
+	static size_t max_n() { return 10'000; }
+
+	std::vector<std::vector<uint64_t>> table;
+
+	static PrecomputedNaive build(const std::vector<uint64_t>& data) {
+		size_t n = data.size();
+
+		PrecomputedNaive rmq;
+		rmq.table.resize(n, std::vector<uint64_t>(n));
+
+		for(size_t l = 0; l < n; ++l) {
+			uint64_t current_min = data[l];
+
+			for(size_t r = l; r < n; ++r) {
+				current_min = std::min(current_min, data[r]);
+				rmq.table[l][r] = current_min;
+			}
+		}
+
+		return rmq;
+	}
+
+	size_t space() const {
+		size_t total = sizeof(*this);
+		for(const auto& row : table) {
+			total += row.capacity() * sizeof(uint64_t);
+		}
+		return total;
+	}
+
+	uint64_t query(size_t l, size_t r) const {
+		return table[l][r];
 	}
 };
 
@@ -111,7 +149,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	for(const auto& input : inputs) {
-		bench<Naive>(input);
+		bench<OnTheFlyNaive>(input);
+		bench<PrecomputedNaive>(input);
 		// TODO: Add other implementations here.
 	}
 
