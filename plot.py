@@ -17,6 +17,7 @@ assert (checksums.eq(ref, axis=0) | checksums.isna()).all(
 
 plt.rcParams["axes.grid"] = True
 
+
 df["space"] = df["space"] * 8 / df["n"]  # bytes → bits per element
 
 names = sorted(df["name"].unique())
@@ -54,7 +55,9 @@ fig.savefig("plots/space.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
 # Plot 3: space-time tradeoff at max n
-max_n = df["n"].max()
+counts = df.groupby("n")["name"].nunique()
+full_ns = counts[counts == len(names)].index
+max_n = full_ns.max()
 tradeoff = df[df["n"] == max_n]
 fig, ax = plt.subplots(figsize=(10, 7))
 for _, r in tradeoff.iterrows():

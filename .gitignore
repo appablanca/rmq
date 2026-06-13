@@ -8,3 +8,4 @@
 /rmq-haskell/*.o
 /rmq-csharp/*.exe
 venv
+.vscode
