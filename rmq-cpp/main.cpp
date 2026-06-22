@@ -86,7 +86,6 @@ struct PrecomputedNaive
 struct SparseTable
 {
 	static std::string name() { return "SparseTable"; }
-	// NOTE: Improved implementations should simply return size_t::MAX.
 	static size_t max_n() { return SIZE_MAX; }
 
 	std::vector<std::vector<uint64_t>> table;
@@ -140,6 +139,35 @@ struct SparseTable
 		size_t k = static_cast<size_t>(log2(len));
 
 		return std::min(table[k][l], table[k][r + 1 - (1ULL << k)]);
+	}
+};
+
+struct SegmentTree
+{
+	static std::string name() { return "SegmentTree"; }
+
+	static size_t max_n() { return SIZE_MAX; }
+
+	const std::vector<uint64_t> *data;
+
+	static SegmentTree build(const std::vector<uint64_t> &data)
+	{
+		const size_t n = data.size();
+		const size_t k = static_cast<size_t>(std::log2(n));
+		return {&data};
+	}
+
+	size_t space() const
+	{
+		return sizeof(*this);
+	}
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		uint64_t min = (*data)[l];
+		for (size_t i = l + 1; i <= r; ++i)
+			min = std::min(min, (*data)[i]);
+		return min;
 	}
 };
 
