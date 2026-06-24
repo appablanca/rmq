@@ -2,7 +2,9 @@
 \nolinenumbers
 
 \title{Range Minimum Queries}
+
 \author{Feyzi Eren Gündoğdu}{Karlsruhe Institute of Technology, Germany}{}{}{}
+\authorrunning{F. E. Gündoğdu}
 \hideLIPIcs
 
 \begin{document}
@@ -10,26 +12,43 @@
 
 
 \section{Introduction}
-TODO
+This report presents a comparison of different data structures and their performance for Range Minimum Queries (RMQ) in C++.
+
+Six different data structures, including two naive and four advanced approaches, are discussed in this report.
+The naive algorithms, $OnTheFlyNaive$ and $PrecomputedNaive$, are included to provide upper-bound performance comparisons for RMQ.
+The advanced data structures considered are $SparseTable$, $SegmentTree$, $BlockSparseTable$, and $CartesianTree$.
+
+For some of the advanced data structures, different variants were evaluated and are represented by different suffixes (e.g., $BST16$ denotes a Block Sparse Table with a block size of 16).
+$n$ represents the input size, $B$ represents block size.
+
+TODO FILES
 
 \section{Methods}
-TODO
+In this section, each data structure is discussed in detail.
+Only the non-naive aspects of the implementation and analysis are presented.
+
+\subsection{OnTheFlyNaive}
+This data structure is simply an array that stores the data directly and answers queries by computing the result on the fly.
+Due to this straightforward approach, it requires $O(1)$ space overhead and requires $O(n)$ time to answer each query, as can be seen in \hyperref[fig:space]{Figure~\ref*{fig:space}} and \hyperref[fig:time]{Figure~\ref*{fig:time}}.
 
 \section{Results}
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=.8\linewidth]{../plots/space.png}
-	\caption{space usage}
+	\caption{overhead space usage}
+	\label{fig:space}
 \end{figure}
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=.8\linewidth]{../plots/query_time.png}
 	\caption{query time}
+	\label{fig:time}
 \end{figure}
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=.8\linewidth]{../plots/space_time_tradeoff.png}
 	\caption{space-time trade-off}
+	\label{fig:tradeoff}
 \end{figure}
 
 TODO
