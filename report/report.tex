@@ -21,6 +21,24 @@ The advanced data structures considered are $SparseTable$, $SegmentTree$, $Block
 For some of the advanced data structures, different variants were evaluated and are represented by different suffixes (e.g., $BST16$ denotes a Block Sparse Table with a block size of 16).
 $n$ represents the input size, $B$ represents block size.
 
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\hline
+Algorithm & Space overhead (bits) & Query time \\
+\hline
+OnTheFlyNaive & $O(1)$ & $O(n)$ \\
+PrecomputedNaive & $O(n^2 \log n)$ & $O(1)$ \\
+Sparse Table & $O(n \log^2 n)$ & $O(1)$ \\
+Segment Tree & $O(n \log n)$ & $O(\log n)$ \\
+Blocks & $O\!\left(\frac{n}{s}\log^2 n\right)$ & $O(s)$ \\
+Cartesian Trees & $O(n \log n)$ & $O(1)$ \\
+\hline
+\end{tabular}
+\caption{Theoretical bounds.}
+\label{tab:theoretical-bounds}
+\end{table}
+
 TODO FILES
 
 \section{Methods}
@@ -28,15 +46,101 @@ In this section, each data structure is discussed in detail.
 Only the non-naive aspects of the implementation and analysis are presented.
 
 \subsection{OnTheFlyNaive}
-This data structure is simply an array that stores the data directly and answers queries by computing the result on the fly.
-Due to this straightforward approach, it requires $O(1)$ space overhead and requires $O(n)$ time to answer each query, as can be seen in \hyperref[fig:space]{Figure~\ref*{fig:space}} and \hyperref[fig:time]{Figure~\ref*{fig:time}}.
+This algorithm stores only a pointer to the input data and answers each query by scanning the requested range on the fly. 
+Since no preprocessing is performed and no additional RMQ data structure is stored, it requires only $O(1)$ extra space. 
+In the worst case, a query may scan the whole array, so the query time is $O(n)$.
 
+\subsection{PrecomputedNaive}
+This algorithm stores the answers for all possible RMQ instances in a triangular
+table. For every left endpoint $l$, it stores the minimum index of each range
+$[l,r]$ with $l \le r$. Since only ranges with $l \le r$ are valid, it is
+sufficient to store the upper triangular part of the full $n \times n$ table.
+In the implementation, the entry for the range $[l,r]$ is stored at position
+\[
+\texttt{table}[l][r-l].
+\]
+Equivalently, in a flat triangular layout, the range $[l,r]$ can be mapped to a
+single array position by
+\[
+l \cdot n - \frac{l(l-1)}{2} + (r-l).
+\]
+A query can then be answered by directly accessing the corresponding table entry.
+The algorithm theoretically requires $O(n^2 \log n)$ bits of space and query time is $O(1)$.
+For this implementation, each entry is stored as a fixed-width \texttt{uint32\_t} instead of using exactly $\lceil \log_2 n\rceil$ bits per entry. 
+Therefore, the expected space usage follows
+\[
+O\!\left(\frac{n(n+1)}{2}\right)
+\]
+machine words, while the corresponding theoretical space complexity is
+\[
+O\!\left(\frac{n(n+1)}{2}\log n\right)
+=
+O(n^2 \log n).
+\]
 \section{Results}
+
+\subsection{OnTheFlyNaive}
+\subsubsection{Space}
+In the bits-per-element plot in \hyperref[fig:space]{Figure~\ref*{fig:space}}, the space usage appears to converge to $0$. 
+This is expected, because the method uses only constant additional space. 
+In this implementation, the only stored data is a pointer to the input array, which takes approximately $8$ bytes. 
+Therefore, the plotted value is approximately $64/n$ bits per element, which tends to $0$ as $n$ grows.
+The absolute space overhead is shown in \hyperref[fig:overhead]{Figure~\ref*{fig:overhead}}. 
+There, the space usage remains constant at approximately $64$ bits, matching the theoretical $O(1)$ extra space bound.
+\subsubsection{Time}
+The query time in \hyperref[fig:time]{Figure~\ref*{fig:time}} grows with $n$, which is consistent with the $O(n)$ worst-case query time. 
+This is because each query is answered by scanning the queried range directly.
+
+\subsection{PrecomputedNaive}
+\subsubsection{Space}
+The results from \texttt{data.csv} indicate that the measured space usage matches
+the expected implementation-level bound. For example, for $n = 10000$, the table
+contains
+\[
+\frac{10000 \cdot 10001}{2}
+\]
+entries. Since each entry is stored as a \texttt{uint32\_t}, each entry occupies
+$4$ bytes. Therefore, the expected space usage is approximately
+\[
+4 \cdot \frac{10000 \cdot 10001}{2}
+=
+200020000
+\]
+bytes, plus a small constant overhead. This matches the measured value
+$200020040$ bytes.
+Although the curve appears almost linear in the log-log \hyperref[fig:overhead]{Figure~\ref*{fig:overhead}}, this does not indicate linear space growth in $n$. 
+The measured space usage of PrecomputedNaive is proportional to
+\[
+32 \cdot \frac{n(n+1)}{2}
+\]
+bits, which is $\Theta(n^2)$. On a log-log plot, polynomial growth appears as a
+straight line; in this case, the slope corresponds to quadratic growth.
+\subsubsection{Time}
+For the query time, the theoretical $O(1)$ bound is only approximately visible
+in the measurements. Each query performs a constant number of table lookups, but
+the measured running time is affected by cache and memory hierarchy effects as
+the table grows. Nevertheless, \hyperref[fig:time]{Figure~\ref*{fig:time}}
+shows that PrecomputedNaive behaves near-constantly.
+The query time of PrecomputedNaive increases sharply from $n=1000$ to $n=3000$,
+but grows more slowly afterwards. This can be explained by cache effects. For
+small inputs, a large part of the precomputed table can still be served from
+cache. Once the table exceeds the relevant cache levels, random table lookups
+become much more expensive. After this point, the queries are already mostly
+memory-latency bound, so increasing $n$ further does not necessarily lead to a
+proportional increase in query time. Thus, the observed behavior is consistent
+with an $O(1)$ query algorithm affected by the memory hierarchy.
+
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=.8\linewidth]{../plots/space.png}
-	\caption{overhead space usage}
+	\caption{space usage}
 	\label{fig:space}
+\end{figure}
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=.8\linewidth]{../plots/space_overhead.png}
+	\caption{space overhead}
+	\label{fig:overhead}
 \end{figure}
 \begin{figure}[ht]
 	\centering
@@ -51,6 +155,7 @@ Due to this straightforward approach, it requires $O(1)$ space overhead and requ
 	\label{fig:tradeoff}
 \end{figure}
 
-TODO
+
+
 
 \end{document}

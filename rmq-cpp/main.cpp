@@ -8,6 +8,11 @@
 #include <string>
 #include <vector>
 
+
+#include <algorithm>
+#include <stdexcept>
+#include <limits>
+
 // RMQ interface (duck-typed via templates):
 //
 //   static std::string name();
@@ -44,44 +49,58 @@ struct PrecomputedNaive
 
 	static size_t max_n() { return 10'000; }
 
-	std::vector<std::vector<uint64_t>> table;
+	const std::vector<uint64_t> *data = nullptr;
+
+	size_t n = 0;
+
+	std::vector<uint32_t> table;
+
+	size_t index(size_t l, size_t r) const
+	{
+		return l * n - (l * (l - 1)) / 2 + (r - l);
+	}
 
 	static PrecomputedNaive build(const std::vector<uint64_t> &data)
 	{
-		size_t n = data.size();
-
+		const size_t n = data.size();
 		PrecomputedNaive rmq;
-		rmq.table.resize(n, std::vector<uint64_t>(n));
+
+		rmq.data = &data;
+		rmq.n = n;
+		rmq.table.resize(n * (n + 1) / 2);
 
 		for (size_t l = 0; l < n; ++l)
 		{
-			uint64_t current_min = data[l];
+			uint32_t min_pos = static_cast<uint32_t>(l);
 
 			for (size_t r = l; r < n; ++r)
 			{
-				current_min = std::min(current_min, data[r]);
-				rmq.table[l][r] = current_min;
+				if (data[r] < data[min_pos])
+				{
+					min_pos = static_cast<uint32_t>(r);
+				}
+
+				rmq.table[rmq.index(l, r)] = min_pos;
 			}
 		}
-
 		return rmq;
 	}
 
 	size_t space() const
 	{
 		size_t total = sizeof(*this);
-		for (const auto &row : table)
-		{
-			total += row.capacity() * sizeof(uint64_t);
-		}
+
+		total += table.capacity() * sizeof(uint32_t);
+
 		return total;
 	}
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		return table[l][r];
+		return (*data)[table[index(l, r)]];
 	}
 };
+
 
 struct SparseTable
 {
@@ -264,7 +283,7 @@ int main(int argc, char *argv[])
 	for (const auto &input : inputs)
 	{
 		bench<OnTheFlyNaive>(input);
-		bench<PrecomputedNaive>(input);
+		bench<PrecomputedNaive>(input);;
 		bench<SparseTable>(input);
 		// TODO: Add other implementations here.
 	}
