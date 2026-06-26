@@ -21,6 +21,11 @@ The advanced data structures considered are $SparseTable$, $SegmentTree$, $Block
 For some of the advanced data structures, different variants were evaluated and are represented by different suffixes (e.g., $BST16$ denotes a Block Sparse Table with a block size of 16).
 $n$ represents the input size, $B$ represents block size.
 
+
+TODO FILES
+
+\section{Methods}
+
 \begin{table}[h]
 \centering
 \begin{tabular}{lcc}
@@ -29,7 +34,7 @@ Algorithm & Space overhead (bits) & Query time \\
 \hline
 OnTheFlyNaive & $O(1)$ & $O(n)$ \\
 PrecomputedNaive & $O(n^2 \log n)$ & $O(1)$ \\
-Sparse Table & $O(n \log^2 n)$ & $O(1)$ \\
+Sparse Table & $O(n \log n)$ & $O(1)$ \\
 Segment Tree & $O(n \log n)$ & $O(\log n)$ \\
 Blocks & $O\!\left(\frac{n}{s}\log^2 n\right)$ & $O(s)$ \\
 Cartesian Trees & $O(n \log n)$ & $O(1)$ \\
@@ -39,11 +44,6 @@ Cartesian Trees & $O(n \log n)$ & $O(1)$ \\
 \label{tab:theoretical-bounds}
 \end{table}
 
-TODO FILES
-
-\section{Methods}
-In this section, each data structure is discussed in detail.
-Only the non-naive aspects of the implementation and analysis are presented.
 
 \subsection{OnTheFlyNaive}
 This algorithm stores only a pointer to the input data and answers each query by scanning the requested range on the fly. 
@@ -55,10 +55,7 @@ This algorithm stores the answers for all possible RMQ instances in a triangular
 table. For every left endpoint $l$, it stores the minimum index of each range
 $[l,r]$ with $l \le r$. Since only ranges with $l \le r$ are valid, it is
 sufficient to store the upper triangular part of the full $n \times n$ table.
-In the implementation, the entry for the range $[l,r]$ is stored at position
-\[
-\texttt{table}[l][r-l].
-\]
+In the implementation, the entry for the range $[l,r]$ is stored at position $\texttt{table}[l][r-l]$.
 Equivalently, in a flat triangular layout, the range $[l,r]$ can be mapped to a
 single array position by
 \[
@@ -67,16 +64,26 @@ l \cdot n - \frac{l(l-1)}{2} + (r-l).
 A query can then be answered by directly accessing the corresponding table entry.
 The algorithm theoretically requires $O(n^2 \log n)$ bits of space and query time is $O(1)$.
 For this implementation, each entry is stored as a fixed-width \texttt{uint32\_t} instead of using exactly $\lceil \log_2 n\rceil$ bits per entry. 
-Therefore, the expected space usage follows
-\[
-O\!\left(\frac{n(n+1)}{2}\right)
-\]
-machine words, while the corresponding theoretical space complexity is
+Therefore, the corresponding theoretical space complexity is
 \[
 O\!\left(\frac{n(n+1)}{2}\log n\right)
 =
 O(n^2 \log n).
 \]
+
+\subsection{SparseTable}
+This algorithm stores a sparse table as a nested vector with $k+1$ levels, where $k = \lfloor \log_2 n \rfloor$.
+At level $\ell$, the table stores one entry for each valid interval of length $2^\ell$, resulting in $n+1-2^\ell$ entries. 
+Each entry stores the index of the minimum element in the corresponding interval. 
+In the implementation, these indices are stored using \texttt{size\_t}.
+To answer a query $[l,r]$, the algorithm chooses $\ell = \lfloor \log_2(r-l+1) \rfloor$ and combines the two overlapping intervals of length $2^\ell$ that cover the query range. 
+This requires only two table accesses and one comparison, so the theoretical query time is $O(1)$.
+The exact number of stored entries is
+\[
+\sum_{\ell=0}^{\lfloor \log_2 n \rfloor} (n+1-2^\ell).
+\]
+Thus, the sparse table stores $O(n \log n)$ entries. Since each entry is stored as a fixed-size \texttt{size\_t} value in the implementation, the theoretical space usage is proportional to $O(n \log n)$.
+
 \section{Results}
 
 \subsection{OnTheFlyNaive}
@@ -90,15 +97,14 @@ There, the space usage remains constant at approximately $64$ bits, matching the
 \subsubsection{Time}
 The query time in \hyperref[fig:time]{Figure~\ref*{fig:time}} grows with $n$, which is consistent with the $O(n)$ worst-case query time. 
 This is because each query is answered by scanning the queried range directly.
+\subsubsection{Tradeoff}
 
 \subsection{PrecomputedNaive}
 \subsubsection{Space}
 The results from \texttt{data.csv} indicate that the measured space usage matches
 the expected implementation-level bound. For example, for $n = 10000$, the table
 contains
-\[
-\frac{10000 \cdot 10001}{2}
-\]
+\[ \frac{10000 \cdot 10001}{2} \]
 entries. Since each entry is stored as a \texttt{uint32\_t}, each entry occupies
 $4$ bytes. Therefore, the expected space usage is approximately
 \[
@@ -108,7 +114,7 @@ $4$ bytes. Therefore, the expected space usage is approximately
 \]
 bytes, plus a small constant overhead. This matches the measured value
 $200020040$ bytes.
-Although the curve appears almost linear in the log-log \hyperref[fig:overhead]{Figure~\ref*{fig:overhead}}, this does not indicate linear space growth in $n$. 
+Although the curve appears almost linear in the log-log \hyperref[fig:space]{Figure~\ref*{fig:space}}, this does not indicate linear space growth in $n$. 
 The measured space usage of PrecomputedNaive is proportional to
 \[
 32 \cdot \frac{n(n+1)}{2}
@@ -129,6 +135,31 @@ become much more expensive. After this point, the queries are already mostly
 memory-latency bound, so increasing $n$ further does not necessarily lead to a
 proportional increase in query time. Thus, the observed behavior is consistent
 with an $O(1)$ query algorithm affected by the memory hierarchy.
+\subsubsection{Tradeoff}
+
+
+\subsection{SparseTable}
+\subsubsection{Space}
+Numerically, the measurements from \texttt{data.csv} follow the theoretical bounds discussed above. 
+In \hyperref[fig:overhead]{Figure~\ref*{fig:overhead}}, the absolute space overhead of the sparse table increases slightly faster than linearly. 
+This is expected, since the sparse table stores entries for all power-of-two interval lengths, giving an $O(n \log n)$ space usage.
+The behavior in \hyperref[fig:space]{Figure~\ref*{fig:space}} is also consistent with the theory. 
+Since this plot shows the space usage normalized by the input size, the expected growth for the sparse table is
+\[
+\frac{O(n \log n)}{n} = O(\log n).
+\]
+Thus, the slow increase in bits per element matches the expected logarithmic growth.
+\subsubsection{Time}
+For the query time analysis, \hyperref[fig:time]{Figure~\ref*{fig:time}} shows that the sparse table has almost constant query time for the smaller input sizes, which is consistent with the theoretical $O(1)$ query bound.
+For larger input sizes, however, the measured query time increases.
+This does not contradict the theoretical complexity. 
+A sparse table query still performs only two table accesses and one comparison. 
+The increase in running time is caused by practical hardware effects. 
+As the input size grows, the sparse table becomes too large to fit into the CPU caches. 
+Consequently, the two table accesses are more likely to cause cache misses and main-memory accesses, which have higher latency. 
+Thus, the measured running time increases due to memory hierarchy effects.
+\subsubsection{Tradeoff}
+
 
 \begin{figure}[ht]
 	\centering
