@@ -84,6 +84,15 @@ The exact number of stored entries is
 \]
 Thus, the sparse table stores $O(n \log n)$ entries. Since each entry is stored as a fixed-size \texttt{size\_t} value in the implementation, the theoretical space usage is proportional to $O(n \log n)$.
 
+\subsection{SegmentTree}
+
+The Segment Tree is a hierarchical data structure for answering RMQ queries.
+As in the Sparse Table implementation, it stores indices of minimum elements rather than the values themselves.
+The main difference is that the Segment Tree stores minima for disjoint blocks at each level.
+In contrast, the Sparse Table stores minima for all overlapping intervals of length $2^k$.
+This reduces the practical space usage compared to the Sparse Table.
+However, queries are slower because they require traversing several levels of the tree.
+The theoretical space complexity is $O(n)$, with query time is $O(\log n)$.
 \section{Results}
 
 \subsection{OnTheFlyNaive}
@@ -92,12 +101,11 @@ In the bits-per-element plot in \hyperref[fig:space]{Figure~\ref*{fig:space}}, t
 This is expected, because the method uses only constant additional space. 
 In this implementation, the only stored data is a pointer to the input array, which takes approximately $8$ bytes. 
 Therefore, the plotted value is approximately $64/n$ bits per element, which tends to $0$ as $n$ grows.
-The absolute space overhead is shown in \hyperref[fig:overhead]{Figure~\ref*{fig:overhead}}. 
-There, the space usage remains constant at approximately $64$ bits, matching the theoretical $O(1)$ extra space bound.
+So, the space usage remains constant at approximately $64$ bits, matching the theoretical $O(1)$ extra space bound.
 \subsubsection{Time}
 The query time in \hyperref[fig:time]{Figure~\ref*{fig:time}} grows with $n$, which is consistent with the $O(n)$ worst-case query time. 
 This is because each query is answered by scanning the queried range directly.
-\subsubsection{Tradeoff}
+
 
 \subsection{PrecomputedNaive}
 \subsubsection{Space}
@@ -135,14 +143,12 @@ become much more expensive. After this point, the queries are already mostly
 memory-latency bound, so increasing $n$ further does not necessarily lead to a
 proportional increase in query time. Thus, the observed behavior is consistent
 with an $O(1)$ query algorithm affected by the memory hierarchy.
-\subsubsection{Tradeoff}
+
 
 
 \subsection{SparseTable}
 \subsubsection{Space}
 Numerically, the measurements from \texttt{data.csv} follow the theoretical bounds discussed above. 
-In \hyperref[fig:overhead]{Figure~\ref*{fig:overhead}}, the absolute space overhead of the sparse table increases slightly faster than linearly. 
-This is expected, since the sparse table stores entries for all power-of-two interval lengths, giving an $O(n \log n)$ space usage.
 The behavior in \hyperref[fig:space]{Figure~\ref*{fig:space}} is also consistent with the theory. 
 Since this plot shows the space usage normalized by the input size, the expected growth for the sparse table is
 \[
@@ -158,20 +164,24 @@ The increase in running time is caused by practical hardware effects.
 As the input size grows, the sparse table becomes too large to fit into the CPU caches. 
 Consequently, the two table accesses are more likely to cause cache misses and main-memory accesses, which have higher latency. 
 Thus, the measured running time increases due to memory hierarchy effects.
-\subsubsection{Tradeoff}
 
-
+\subsection{SegmentTree}
+\subsubsection{Space}
+Numerically, the algorithm behaves in line with the theoretical space bound.
+It displays the expected linear behavior with a small constant factor, as can be seen in \hyperref[fig:space]{Figure~\ref*{fig:space}}.
+The total number of stored indices is bounded by $2n$ for an input of size $n$.
+Since each stored index requires $8$ bytes on the tested machine, the measured space usage is bounded by approximately $16n$ bytes.
+\subsubsection{Time}
+For the query time analysis, \hyperref[fig:time]{Figure~\ref*{fig:time}} shows that the algorithm is noticeably slower than Sparse Table.
+This is expected because Sparse Table answers queries with a constant number of table accesses.
+In contrast, this Segment Tree implementation performs repeated branching and level-by-level traversal during each query.
+Although the theoretical query time is $O(\log n)$, the measurements in \texttt{data.csv} do not show a clean logarithmic trend.
+This is likely caused by cache effects, branch prediction, and other hardware-level effects.
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=.8\linewidth]{../plots/space.png}
 	\caption{space usage}
 	\label{fig:space}
-\end{figure}
-\begin{figure}[ht]
-	\centering
-	\includegraphics[width=.8\linewidth]{../plots/space_overhead.png}
-	\caption{space overhead}
-	\label{fig:overhead}
 \end{figure}
 \begin{figure}[ht]
 	\centering

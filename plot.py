@@ -18,7 +18,6 @@ assert (checksums.eq(ref, axis=0) | checksums.isna()).all(
 plt.rcParams["axes.grid"] = True
 
 
-df["space_overhead"] = df["space"] * 8 
 df["space"] = df["space"] * 8 / df["n"]  # bytes → bits per element
 
 names = sorted(df["name"].unique())
@@ -55,23 +54,8 @@ fig.tight_layout()
 fig.savefig("plots/space.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
-# Plot 3: absolute space overhead 
-fig, ax = plt.subplots(figsize=(10, 7))
-pivot("space_overhead").plot(ax=ax, marker="o", color=[colors[n] for n in names])
-ax.set_xlabel("n")
-ax.set_ylabel("Space overhead (bits)")
-ax.set_xscale("log")
-ax.set_yscale("log", base=2)
-ax.set_title("Space overhead")
-ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=4)
-fig.tight_layout()
-fig.savefig("plots/space_overhead.png", dpi=150, bbox_inches="tight")
-plt.close(fig)
-
-# Plot 4: space-time tradeoff at max n
-counts = df.groupby("n")["name"].nunique()
-full_ns = counts[counts == len(names)].index
-max_n = full_ns.max()
+# Plot 3: space-time tradeoff at max n
+max_n = df["n"].max()
 tradeoff = df[df["n"] == max_n]
 fig, ax = plt.subplots(figsize=(10, 7))
 for _, r in tradeoff.iterrows():
@@ -97,6 +81,5 @@ fig.savefig("plots/space_time_tradeoff.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
 print(
-    "Saved plots/query_time.png, plots/space.png, plots/space_overhead.png, "
-    "plots/space_time_tradeoff.png"
+    "Saved plots/query_time.png, plots/space.png, plots/space_time_tradeoff.png"
 )

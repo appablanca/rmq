@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 
-
 #include <algorithm>
 #include <stdexcept>
 #include <limits>
@@ -101,85 +100,84 @@ struct PrecomputedNaive
 	}
 };
 
-
 struct SparseTable
 {
-    static std::string name() { return "SparseTable"; }
-    static size_t max_n() { return SIZE_MAX; }
+	static std::string name() { return "SparseTable"; }
+	static size_t max_n() { return SIZE_MAX; }
 
-    const std::vector<uint64_t>* data = nullptr;
-    std::vector<std::vector<size_t>> table;
+	const std::vector<uint64_t> *data = nullptr;
+	std::vector<std::vector<size_t>> table;
 
-    static SparseTable build(const std::vector<uint64_t>& data)
-    {
-        const size_t n = data.size();
-        const size_t k = static_cast<size_t>(std::log2(n));
+	static SparseTable build(const std::vector<uint64_t> &data)
+	{
+		const size_t n = data.size();
+		const size_t k = static_cast<size_t>(std::log2(n));
 
-        SparseTable rmq;
-        rmq.data = &data;
+		SparseTable rmq;
+		rmq.data = &data;
 
-        rmq.table.resize(k + 1);
+		rmq.table.resize(k + 1);
 
-        rmq.table[0].resize(n);
+		rmq.table[0].resize(n);
 
-        for (size_t i = 0; i < n; i++)
-        {
-            rmq.table[0][i] = i;
-        }
+		for (size_t i = 0; i < n; i++)
+		{
+			rmq.table[0][i] = i;
+		}
 
-        for (size_t level = 1; level <= k; level++)
-        {
-            size_t len = 1ULL << level;
-            size_t half = 1ULL << (level - 1);
-            size_t L = n + 1 - len;
+		for (size_t level = 1; level <= k; level++)
+		{
+			size_t len = 1ULL << level;
+			size_t half = 1ULL << (level - 1);
+			size_t L = n + 1 - len;
 
-            rmq.table[level].resize(L);
+			rmq.table[level].resize(L);
 
-            for (size_t j = 0; j < L; j++)
-            {
-                size_t left_idx = rmq.table[level - 1][j];
-                size_t right_idx = rmq.table[level - 1][j + half];
+			for (size_t j = 0; j < L; j++)
+			{
+				size_t left_idx = rmq.table[level - 1][j];
+				size_t right_idx = rmq.table[level - 1][j + half];
 
-                if (data[left_idx] <= data[right_idx])
-                    rmq.table[level][j] = left_idx;
-                else
-                    rmq.table[level][j] = right_idx;
-            }
-        }
+				if (data[left_idx] <= data[right_idx])
+					rmq.table[level][j] = left_idx;
+				else
+					rmq.table[level][j] = right_idx;
+			}
+		}
 
-        return rmq;
-    }
+		return rmq;
+	}
 
-    size_t space() const
-    {
-        size_t bytes = sizeof(*this);
+	size_t space() const
+	{
+		size_t bytes = sizeof(*this);
 
-        for (const auto& row : table)
-        {
-            bytes += row.size() * sizeof(size_t);
-        }
+		for (const auto &row : table)
+		{
+			bytes += row.size() * sizeof(size_t);
+		}
 
-        return bytes;
-    }
+		return bytes;
+	}
 
-    size_t query_index(size_t l, size_t r) const
-    {
-        size_t len = r - l + 1;
-        size_t k = static_cast<size_t>(std::log2(len));
+	size_t query_index(size_t l, size_t r) const
+	{
+		size_t len = r - l + 1;
+		size_t k = static_cast<size_t>(std::log2(len));
 
-        size_t left_idx = table[k][l];
-        size_t right_idx = table[k][r + 1 - (1ULL << k)];
+		size_t left_idx = table[k][l];
+		size_t right_idx = table[k][r + 1 - (1ULL << k)];
 
-        if ((*data)[left_idx] <= (*data)[right_idx])
-            return left_idx;
-        else
-            return right_idx;
-    }
+		if ((*data)[left_idx] <= (*data)[right_idx])
+			return left_idx;
+		else
+			return right_idx;
+	}
 
-    uint64_t query(size_t l, size_t r) const
-    {
-        return (*data)[query_index(l, r)];
-    }
+	uint64_t query(size_t l, size_t r) const
+	{
+		return (*data)[query_index(l, r)];
+	}
 };
 
 struct SegmentTree
@@ -188,26 +186,112 @@ struct SegmentTree
 
 	static size_t max_n() { return SIZE_MAX; }
 
-	const std::vector<uint64_t> *data;
+	const std::vector<uint64_t> *data = nullptr;
+	std::vector<std::vector<size_t>> tree;
 
 	static SegmentTree build(const std::vector<uint64_t> &data)
 	{
 		const size_t n = data.size();
-		const size_t k = static_cast<size_t>(std::log2(n));
-		return {&data};
+		const size_t k = static_cast<uint64_t>(std::log2(n));
+
+		SegmentTree rmq;
+
+		rmq.data = &data;
+
+		rmq.tree.resize(k + 1);
+		rmq.tree[0].resize(n);
+
+		for (uint64_t i = 0; i < n; i++)
+		{
+			rmq.tree[0][i] = i;
+		}
+
+		for (uint64_t level = 1; level <= k; level++)
+		{
+
+			size_t L = static_cast<size_t>(n / (size_t(1) << level));
+			rmq.tree[level].resize(L);
+			for (size_t j = 0; j < L; j++)
+			{
+				size_t left_idx = rmq.tree[level - 1][2 * j];
+				size_t right_idx = rmq.tree[level - 1][2 * j + 1];
+
+				if (data[left_idx] <= data[right_idx])
+					rmq.tree[level][j] = left_idx;
+				else
+					rmq.tree[level][j] = right_idx;
+			}
+		}
+
+		return rmq;
 	}
 
 	size_t space() const
 	{
-		return sizeof(*this);
+
+		size_t bytes = 0;
+
+		for (const auto &row : tree)
+		{
+			bytes += row.size() * sizeof(size_t);
+		}
+
+		return bytes;
+	}
+
+	size_t query_index(size_t l, size_t r) const
+	{
+		size_t best_idx = SIZE_MAX;
+
+		size_t level = 0;
+		size_t block = 1;
+
+		while (l <= r)
+		{
+			size_t period = 2 * block;
+
+			if (l % period == block)
+			{
+				size_t idx = tree[level][l / block];
+
+				if (best_idx == SIZE_MAX || (*data)[idx] < (*data)[best_idx])
+					best_idx = idx;
+
+				l += block;
+
+				if (l > r)
+					break;
+			}
+
+			if ((r + 1) % period == block)
+			{
+				size_t idx = tree[level][r / block];
+
+				if (best_idx == SIZE_MAX || (*data)[idx] < (*data)[best_idx])
+					best_idx = idx;
+
+				if (r < block)
+				{
+					break;
+				}
+
+				r -= block;
+
+				if (l > r)
+					break;
+			}
+			level++;
+			block <<= 1;
+			if (level >= tree.size())
+				break;
+		}
+
+		return best_idx;
 	}
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		uint64_t min = (*data)[l];
-		for (size_t i = l + 1; i <= r; ++i)
-			min = std::min(min, (*data)[i]);
-		return min;
+		return (*data)[query_index(l, r)];
 	}
 };
 
@@ -304,9 +388,9 @@ int main(int argc, char *argv[])
 	for (const auto &input : inputs)
 	{
 		bench<OnTheFlyNaive>(input);
-		bench<PrecomputedNaive>(input);;
+		bench<PrecomputedNaive>(input);
 		bench<SparseTable>(input);
-		// TODO: Add other implementations here.
+		bench<SegmentTree>(input);
 	}
 
 	return 0;
