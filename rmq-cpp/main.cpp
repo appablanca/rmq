@@ -295,6 +295,124 @@ struct SegmentTree
 	}
 };
 
+struct Blocks
+{
+	static std::string name() { return "Blocks"; }
+	static size_t max_n() { return SIZE_MAX; }
+
+	const std::vector<uint64_t> *data = nullptr;
+	std::vector<std::vector<size_t>> table;
+
+	static Blocks build(const std::vector<uint64_t> &data)
+	{
+		const size_t n = data.size();
+		const size_t blockSize = 4;
+		const size_t k = static_cast<size_t>(std::log(n) / std::log(blockSize)) + 1;
+
+		Blocks rmq;
+		rmq.data = &data;
+
+		rmq.table.resize(k);
+
+		rmq.table[0].resize(n);
+
+		for (size_t i = 0; i < n; i++)
+		{
+			rmq.table[0][i] = i;
+		}
+
+		for (size_t level = 1; level <= k; level++)
+		{
+			rmq.table[level].resize(blockSize);
+
+
+		}
+
+		return rmq;
+	}
+
+	size_t space() const
+	{
+		size_t bytes = sizeof(*this);
+
+		for (const auto &row : table)
+		{
+			bytes += row.size() * sizeof(size_t);
+		}
+
+		return bytes;
+	}
+
+	size_t query_index(size_t l, size_t r) const
+	{
+
+	}
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		return (*data)[query_index(l, r)];
+	}
+};
+
+struct PrecomputeBlocks
+{
+	static std::string name() { return "PrecomputeBlocks"; }
+	static size_t max_n() { return SIZE_MAX; }
+
+	const std::vector<uint64_t> *data = nullptr;
+	std::vector<std::vector<size_t>> table;
+
+	static PrecomputeBlocks build(const std::vector<uint64_t> &data)
+	{
+		const size_t n = data.size();
+		const size_t blockSize = 4;
+		const size_t k = static_cast<size_t>(std::log(n) / std::log(blockSize)) + 1;
+
+		PrecomputeBlocks rmq;
+		rmq.data = &data;
+
+		rmq.table.resize(k);
+
+		rmq.table[0].resize(n);
+
+		for (size_t i = 0; i < n; i++)
+		{
+			rmq.table[0][i] = i;
+		}
+
+		for (size_t level = 1; level <= k; level++)
+		{
+			rmq.table[level].resize(blockSize);
+
+
+		}
+
+		return rmq;
+	}
+
+	size_t space() const
+	{
+		size_t bytes = sizeof(*this);
+
+		for (const auto &row : table)
+		{
+			bytes += row.size() * sizeof(size_t);
+		}
+
+		return bytes;
+	}
+
+	size_t query_index(size_t l, size_t r) const
+	{
+
+	}
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		return (*data)[query_index(l, r)];
+	}
+};
+
 // -------------------------------------------------------------
 // TODO: Implement the RMQ interface for additional data structures.
 // -------------------------------------------------------------
