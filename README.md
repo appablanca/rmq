@@ -1,4 +1,12 @@
-# Range minimum queries programming project
+g++ -O3 -std=c++17 -DNDEBUG -march=native -flto ./rmq-cpp/main.cpp -o rmq
+
+./rmq input > data.csv
+
+chmod +x benchmark.sh
+./benchmark.sh
+
+# Range minimum queries programming projec
+
 
 The project is to implement the following range minimum query (RMQ) algorithms:
 - compute on the fly,
