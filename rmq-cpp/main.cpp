@@ -305,6 +305,45 @@ struct Blocks
 	static Blocks build(const std::vector<uint64_t> &data)
 	{
 		Blocks rmq;
+		rmq.data = &data;
+
+		size_t n = rmq.data->size();
+		size_t amountOfBlocks = (n + BlockSize - 1) / BlockSize;
+		
+		size_t numberOfLevels = 0;
+		for (size_t x = amountOfBlocks; x > 0; x >>= 1)
+			++numberOfLevels;
+
+		rmq.table[0].resize(amountOfBlocks);
+
+		for (size_t block = 0; block < amountOfBlocks; ++block)
+		{
+			const size_t start = block * BlockSize;
+			const size_t end = std::min(start + BlockSize, n);
+
+			uint64_t blockMin = data[start];
+
+			for (size_t j = start + 1; j < end; ++j)
+			{
+				if (data[j] < blockMin)
+				{
+					blockMin = data[j];
+				}
+			}
+			rmq.table[0][block] = blockMin;
+		}
+
+		for (size_t l = 1; l < amountOfBlocks; l++)
+		{
+			size_t levelSize = n / BlockSize + 1 - (1ULL << l);
+			rmq.table[l].resize(levelSize);
+
+			size_t slidingWindowSize = 1ULL << l;
+
+			for (size_t i = 0; i < rmq.table[l - 1].size(); i += slidingWindowSize)
+			{
+			}
+		}
 
 		return rmq;
 	}
@@ -420,12 +459,6 @@ int main(int argc, char *argv[])
 		bench<PrecomputedNaive>(input);
 		bench<SparseTable>(input);
 		bench<SegmentTree>(input);
-
-		bench<Blocks<2>>(input);
-		bench<Blocks<4>>(input);
-		bench<Blocks<8>>(input);
-		bench<Blocks<16>>(input);
-		bench<Blocks<32>>(input);
 	}
 
 	return 0;
