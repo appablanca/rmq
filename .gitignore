@@ -1,12 +1,5 @@
 /input/
-/rmq
-/rmq-java/build/
-/rmq-go/rmq-go
-/rmq-kotlin/rmq-kotlin.jar
-/rmq-haskell/rmq-haskell
-/rmq-haskell/*.hi
-/rmq-haskell/*.o
-/rmq-csharp/*.exe
+
 venv
 .vscode
 lipics-v2021.cls
@@ -18,3 +11,4 @@ report.out
 report.synctex.gz
 report.vtc
 .DS_Store
+rmq

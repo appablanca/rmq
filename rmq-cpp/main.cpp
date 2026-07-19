@@ -7,8 +7,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-
-#include <algorithm>
 #include <stdexcept>
 #include <limits>
 
@@ -306,23 +304,23 @@ struct Blocks
 
 	static Blocks build(const std::vector<uint64_t> &data)
 	{
-		size_t BlockAmount = (n + BlockSize - 1) / BlockSize;
-		rmq.table[0].resize(BlockAmount);
-		for (size_t i = 0; i < rqm.data.size(); i += BlockSize)
-		{
-			auto low = std::min({, v2, v3, v4});
-		}
+		Blocks rmq;
+
+		return rmq;
 	}
 
 	size_t query_index(size_t l, size_t r) const
 	{
+		return 0;
 	}
 	uint64_t query(size_t l, size_t r) const
 	{
+		return 0;
 	}
 
 	size_t space() const
 	{
+		return 0;
 	}
 };
 
