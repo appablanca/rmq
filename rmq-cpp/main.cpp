@@ -20,7 +20,6 @@
 //   size_t space() const;
 //   uint64_t query(size_t l, size_t r) const;
 
-// Trivial implementation that computes each query on the fly.
 struct OnTheFlyNaive
 {
 	static std::string name() { return "OnTheFlyNaive"; }
@@ -298,202 +297,32 @@ struct SegmentTree
 template <size_t BlockSize>
 struct Blocks
 {
-	static std::string name()
-	{
-		return "Block" + std::to_string(BlockSize);
-	}
+	static std::string name() { return "Block" + std::to_string(BlockSize); }
 
-	static size_t max_n()
-	{
-		return SIZE_MAX;
-	}
+	static size_t max_n() { return SIZE_MAX; }
 
 	const std::vector<uint64_t> *data = nullptr;
-
 	std::vector<std::vector<size_t>> table;
+
 	static Blocks build(const std::vector<uint64_t> &data)
 	{
-		const size_t n = data.size();
-
-		Blocks rmq;
-		rmq.data = &data;
-
-		if (n == 0)
-			return rmq;
-
-		const size_t numberOfBlocks =
-			(n + BlockSize - 1) / BlockSize;
-
-		size_t numberOfLevels = 0;
-
-		for (size_t x = numberOfBlocks; x > 0; x >>= 1)
-			++numberOfLevels;
-
-		rmq.table.resize(numberOfLevels);
-
-		rmq.table[0].resize(numberOfBlocks);
-
-		for (size_t block = 0; block < numberOfBlocks; ++block)
+		size_t BlockAmount = (n + BlockSize - 1) / BlockSize;
+		rmq.table[0].resize(BlockAmount);
+		for (size_t i = 0; i < rqm.data.size(); i += BlockSize)
 		{
-			const size_t begin = block * BlockSize;
-			const size_t end = std::min(begin + BlockSize, n);
-
-			size_t minimumIndex = begin;
-
-			for (size_t i = begin + 1; i < end; ++i)
-			{
-				if (data[i] < data[minimumIndex])
-					minimumIndex = i;
-			}
-
-			rmq.table[0][block] = minimumIndex;
+			auto low = std::min({, v2, v3, v4});
 		}
-
-		for (size_t level = 1; level < numberOfLevels; ++level)
-		{
-			const size_t blockSpan = size_t{1} << level;
-			const size_t halfSpan = blockSpan >> 1;
-
-			const size_t currentLevelSize =
-				numberOfBlocks + 1 - blockSpan;
-
-			rmq.table[level].resize(currentLevelSize);
-
-			for (size_t j = 0; j < currentLevelSize; ++j)
-			{
-				const size_t leftIndex =
-					rmq.table[level - 1][j];
-
-				const size_t rightIndex =
-					rmq.table[level - 1][j + halfSpan];
-
-				rmq.table[level][j] =
-					data[leftIndex] <= data[rightIndex]
-						? leftIndex
-						: rightIndex;
-			}
-		}
-
-		return rmq;
 	}
 
-	static size_t floor_log2(size_t x)
-
-	{
-
-		size_t result = 0;
-
-		while (x > 1)
-
-		{
-
-			x >>= 1;
-
-			++result;
-		}
-
-		return result;
-	}
 	size_t query_index(size_t l, size_t r) const
 	{
-		if (data == nullptr || l > r || r >= data->size())
-			throw std::out_of_range("Invalid RMQ range");
-
-		const size_t leftBlock = l / BlockSize;
-		const size_t rightBlock = r / BlockSize;
-
-		size_t minimumIndex = l;
-
-		auto consider = [&](size_t index)
-		{
-			if ((*data)[index] < (*data)[minimumIndex] ||
-				((*data)[index] == (*data)[minimumIndex] &&
-				 index < minimumIndex))
-			{
-				minimumIndex = index;
-			}
-		};
-
-		// Sorgu tamamen tek blok içerisinde.
-		if (leftBlock == rightBlock)
-		{
-			for (size_t i = l + 1; i <= r; ++i)
-				consider(i);
-
-			return minimumIndex;
-		}
-
-		// Sol kısmi blok.
-		const size_t leftEnd =
-			std::min((leftBlock + 1) * BlockSize, data->size());
-
-		for (size_t i = l; i < leftEnd; ++i)
-			consider(i);
-
-		// Sağ kısmi blok.
-		const size_t rightBegin = rightBlock * BlockSize;
-
-		for (size_t i = rightBegin; i <= r; ++i)
-			consider(i);
-
-		// Aradaki tamamen kapsanan bloklar.
-		const size_t firstFullBlock = leftBlock + 1;
-		const size_t lastFullBlock = rightBlock - 1;
-
-		if (firstFullBlock <= lastFullBlock)
-		{
-			const size_t numberOfFullBlocks =
-				lastFullBlock - firstFullBlock + 1;
-
-			const size_t level =
-				floor_log2(numberOfFullBlocks);
-
-			const size_t span =
-				size_t{1} << level;
-
-			const size_t leftIndex =
-				table[level][firstFullBlock];
-
-			const size_t rightIndex =
-				table[level][lastFullBlock + 1 - span];
-
-			consider(leftIndex);
-			consider(rightIndex);
-		}
-
-		return minimumIndex;
 	}
 	uint64_t query(size_t l, size_t r) const
-
 	{
-
-		return (*data)[query_index(l, r)];
 	}
 
 	size_t space() const
-
 	{
-
-		size_t bytes = sizeof(*this);
-
-		// Dynamic storage for the inner vector objects.
-
-		bytes +=
-
-			table.capacity() *
-
-			sizeof(std::vector<size_t>);
-
-		for (const auto &row : table)
-
-		{
-
-			bytes +=
-
-				row.capacity() * sizeof(size_t);
-		}
-
-		return bytes;
 	}
 };
 
