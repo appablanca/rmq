@@ -1,8 +1,7 @@
-all: build run plot
+all: buildCPP build run plot
     
-
-#build:  
-#	g++ -std=c++17 -O3 -march=native rmq-cpp/*.cpp -o rmq
+buildCPP:  
+	g++ -std=c++17 -O3 -march=native rmq-cpp/*.cpp -o rmq
 
 build:
     ./benchmark.sh
