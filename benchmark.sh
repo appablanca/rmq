@@ -1,6 +1,6 @@
 tmpdir=$(mktemp -d)
 
-for i in {1..9}; do
+for i in {1..21}; do
     ./rmq input > "$tmpdir/run_$i.csv"
 done
 
@@ -29,8 +29,8 @@ for key, times in rows.items():
     n, q, name = key
     space, checksum = metadata[key]
 
-    if len(times) != 9:
-        raise RuntimeError(f"{key} has {len(times)} measurements instead of 9")
+    if len(times) != 21:
+        raise RuntimeError(f"{key} has {len(times)} measurements instead of 21")
 
     writer.writerow([
         n,

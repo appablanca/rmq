@@ -1,9 +1,10 @@
-all: buildCPP build run plot
+fast: build run plot
+thick: build bench plot
     
-buildCPP:  
+build:  
 	g++ -std=c++17 -O3 -march=native rmq-cpp/*.cpp -o rmq
 
-build:
+bench:
     ./benchmark.sh
 
 run:

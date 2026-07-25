@@ -580,7 +580,7 @@ struct AdaptiveBlocks4
 
 		rmq.blockSize = std::max<size_t>(
 			1,
-			static_cast<size_t>(C * std::log2(data.size()/4)));
+			static_cast<size_t>(C * std::log2(data.size() / 4)));
 
 		rmq.data = &data;
 
@@ -932,19 +932,24 @@ int main(int argc, char *argv[])
 
 	for (const auto &input : inputs)
 	{
-
 		/*
 		bench<OnTheFlyNaive>(input);
 		bench<PrecomputedNaive>(input);
 		bench<SparseTable>(input);
 		bench<SegmentTree>(input);
-		
 		bench<Blocks<64>>(input);
 		*/
-	
-		bench<AdaptiveBlocks<100>>(input);
-		bench<AdaptiveBlocks4<100>>(input);
 
+		bench<AdaptiveBlocks<50>>(input);
+		bench<AdaptiveBlocks<100>>(input);
+		bench<AdaptiveBlocks<150>>(input);
+		bench<AdaptiveBlocks<200>>(input);
+		bench<AdaptiveBlocks<250>>(input);
+		bench<AdaptiveBlocks<300>>(input);
+		bench<AdaptiveBlocks<350>>(input);
+		bench<AdaptiveBlocks<400>>(input);
+		bench<AdaptiveBlocks<450>>(input);
+		bench<AdaptiveBlocks<500>>(input);
 		/*
 		bench<Blocks<2>>(input);
 		bench<Blocks<4>>(input);
@@ -956,17 +961,10 @@ int main(int argc, char *argv[])
 		bench<Blocks<512>>(input);
 		bench<Blocks<1024>>(input);
 
-		bench<AdaptiveBlocks<50>>(input);
-		bench<AdaptiveBlocks<150>>(input);
-		bench<AdaptiveBlocks<200>>(input);
-		bench<AdaptiveBlocks<250>>(input);
-		bench<AdaptiveBlocks<300>>(input);
-		bench<AdaptiveBlocks<350>>(input);
-		bench<AdaptiveBlocks<400>>(input);
-		bench<AdaptiveBlocks<450>>(input);
-		bench<AdaptiveBlocks<500>>(input);
 
 
+
+		bench<AdaptiveBlocks4<100>>(input);
 
 		bench<BlocksPrecompute<2>>(input);
 		bench<BlocksPrecompute<4>>(input);
