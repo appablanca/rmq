@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <sstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -425,7 +426,10 @@ struct AdaptiveBlocks
 
 	static std::string name()
 	{
-		return "Block log2" + std::to_string(CCOMP);
+		std::ostringstream oss;
+		oss << std::fixed << std::setprecision(1)
+			<< (CCOMP / 100.0);
+		return "log2Block" + oss.str();
 	}
 
 	static size_t max_n() { return SIZE_MAX; }
@@ -937,9 +941,18 @@ int main(int argc, char *argv[])
 		bench<PrecomputedNaive>(input);
 		bench<SparseTable>(input);
 		bench<SegmentTree>(input);
-		bench<Blocks<64>>(input);
 		*/
 
+		bench<Blocks<2>>(input);
+		bench<Blocks<4>>(input);
+		bench<Blocks<8>>(input);
+		bench<Blocks<16>>(input);
+		bench<Blocks<32>>(input);
+		bench<Blocks<64>>(input);
+		bench<Blocks<128>>(input);
+		bench<Blocks<256>>(input);
+		bench<Blocks<512>>(input);
+		bench<Blocks<1024>>(input);
 		bench<AdaptiveBlocks<50>>(input);
 		bench<AdaptiveBlocks<100>>(input);
 		bench<AdaptiveBlocks<150>>(input);
@@ -951,15 +964,7 @@ int main(int argc, char *argv[])
 		bench<AdaptiveBlocks<450>>(input);
 		bench<AdaptiveBlocks<500>>(input);
 		/*
-		bench<Blocks<2>>(input);
-		bench<Blocks<4>>(input);
-		bench<Blocks<8>>(input);
-		bench<Blocks<16>>(input);
-		bench<Blocks<32>>(input);
-		bench<Blocks<128>>(input);
-		bench<Blocks<256>>(input);
-		bench<Blocks<512>>(input);
-		bench<Blocks<1024>>(input);
+
 
 
 

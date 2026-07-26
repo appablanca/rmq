@@ -190,11 +190,7 @@ for current_n in sorted(df["n"].unique()):
 
         name = r["name"]
 
-        if "log" in name:
-            c = int(re.search(r"\d+", name).group())
-            label = f"Block{round((c / 100.0) * np.log2(current_n))}"
-        else:
-            label = name
+        label = name
 
         on_frontier = r["name"] in frontier_names
 
