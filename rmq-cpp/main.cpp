@@ -1142,22 +1142,27 @@ int main(int argc, char *argv[])
 	{
 		/*
 
-
-		*/
 		bench<OnTheFlyNaive>(input);
 		bench<PrecomputedNaive>(input);
 		bench<SparseTable>(input);
 		bench<SegmentTree>(input);
-		bench<Blocks<4>>(input);
-		bench<Blocks<8>>(input);
+
+		*/
+
 		bench<Blocks<16>>(input);
 		bench<Blocks<32>>(input);
 		bench<Blocks<64>>(input);
 		bench<Blocks<128>>(input);
-		bench<Blocks<256>>(input);
-		bench<Blocks<512>>(input);
-		bench<Blocks<1024>>(input);
-		bench<AdaptiveBlocks<100>>(input); // C = 1.0 * log2(n)
+
+		bench<AdaptiveBlocks<100>>(input);
+
+		bench<AdaptiveBlocks<200>>(input);
+
+		bench<AdaptiveBlocks<300>>(input);
+
+		bench<AdaptiveBlocks<400>>(input);
+
+		bench<AdaptiveBlocks<500>>(input);
 
 		/*
 

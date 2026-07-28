@@ -16,3 +16,6 @@ plot:
 
 
 
+generate_input:
+    cd input-generator && cargo run -- -n 1000,3000,10000,30000,100000,300000,1000000,3000000 --output ../input
+
