@@ -2,7 +2,7 @@ fast: build run plot
 thick: build bench plot
     
 build:  
-	g++ -std=c++17 -O3 -march=native rmq-cpp/*.cpp -o rmq
+	g++ -std=c++17 -O3 -march=native -funroll-loops rmq-cpp/*.cpp -o rmq
 
 bench:
     ./benchmark.sh
