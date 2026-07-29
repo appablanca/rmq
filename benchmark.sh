@@ -20,7 +20,14 @@ for filename in files:
         for row in csv.DictReader(f):
             key = (row["n"], row["q"], row["name"])
             rows[key].append(float(row["time"]))
-            metadata[key] = (row["space"], row["sum"])
+
+            meta = (row["space"], row["sum"])
+            if key in metadata and metadata[key] != meta:
+                raise RuntimeError(
+                    f"{key}: inconsistent space/sum across runs — "
+                    f"{metadata[key]} vs {meta}"
+                )
+            metadata[key] = meta
 
 writer = csv.writer(sys.stdout)
 writer.writerow(["n", "q", "name", "space", "sum", "time"])

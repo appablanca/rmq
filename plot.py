@@ -103,20 +103,21 @@ fig.tight_layout()
 fig.savefig("plots/space_time_tradeoff.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
-# Plot 4: space-time tradeoff across multiple n (small multiples)
-# Shows how the Pareto frontier moves with n -- this is the key evidence for
-# whether the C*log(n) choice is actually earning its keep at realistic scales,
-# or whether a fixed block size dominates throughout the tested range.
+# Plot 4: space-time tradeoff across all ns
 all_ns = sorted(df["n"].unique())
-idx = np.linspace(0, len(all_ns) - 1, 6).round().astype(int)
-picked_ns = [all_ns[i] for i in sorted(set(idx))]
 
-ncols = 3
-nrows = -(-len(picked_ns) // ncols)
-fig, axes = plt.subplots(nrows, ncols, figsize=(5 * ncols, 4.5 * nrows))
-axes = axes.flatten()
+ncols = 5
+nrows = -(-len(all_ns) // ncols)
 
-for ax, n_val in zip(axes, picked_ns):
+fig, axes = plt.subplots(
+    nrows,
+    ncols,
+    figsize=(4.5 * ncols, 4 * nrows),
+    layout="constrained",
+)
+axes = np.atleast_1d(axes).flatten()
+
+for ax, n_val in zip(axes, all_ns):
     sub = df[df["n"] == n_val]
     for _, r in sub.iterrows():
         ax.scatter(r["space"], r["time"], color=colors[r["name"]], zorder=3, s=30)
@@ -131,14 +132,14 @@ for ax, n_val in zip(axes, picked_ns):
     ax.set_xscale("log", base=2)
     ax.set_yscale("log", base=2)
     ax.set_title(f"n = {n_val:,}", fontsize="medium")
-    ax.set_xlabel("Space (bits/element)")
-    ax.set_ylabel("Query time (ns/query)")
 
-for ax in axes[len(picked_ns) :]:
+for ax in axes[len(all_ns) :]:
     ax.axis("off")
 
-fig.suptitle("Space-time tradeoff across n (small multiples)", fontsize=14)
-fig.tight_layout(rect=[0, 0, 1, 0.97])
+fig.supxlabel("Space (bits/element)")
+fig.supylabel("Query time (ns/query)")
+fig.suptitle("Space-time tradeoff across n", fontsize=14)
+
 fig.savefig("plots/space_time_tradeoff_by_n.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 

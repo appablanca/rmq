@@ -300,7 +300,7 @@ struct SegmentTree
 template <size_t BlockSize>
 struct Blocks
 {
-	static std::string name() { return "Block" + std::to_string(BlockSize); }
+	static std::string name() { return "FiBl" + std::to_string(BlockSize); }
 
 	static size_t max_n() { return SIZE_MAX; }
 
@@ -430,7 +430,7 @@ struct AdaptiveBlocks
 		std::ostringstream oss;
 		oss << std::fixed << std::setprecision(2)
 			<< (CCOMP / 100.0);
-		return "log2Block" + oss.str();
+		return "AdBl" + oss.str();
 	}
 
 	static size_t max_n() { return SIZE_MAX; }
@@ -565,7 +565,7 @@ struct AdaptiveBlocks
 template <size_t BlockSize>
 struct BlocksPrecompute
 {
-	static std::string name() { return "BlocksPrecompute" + std::to_string(BlockSize); }
+	static std::string name() { return "FiBlPre" + std::to_string(BlockSize); }
 
 	static size_t max_n() { return SIZE_MAX; }
 
@@ -716,7 +716,7 @@ struct AdaptiveBlocksPrecompute
 		std::ostringstream oss;
 		oss << std::fixed << std::setprecision(2)
 			<< (CCOMP / 100.0);
-		return "AdaptiveBlocksPrecompute" + oss.str();
+		return "AdBlPre" + oss.str();
 	}
 
 	static size_t max_n() { return SIZE_MAX; }
@@ -874,7 +874,7 @@ struct SqrtAdaptiveBlocksPrecompute
 		std::ostringstream oss;
 		oss << std::fixed << std::setprecision(2)
 			<< (CCOMP / 100.0);
-		return "SqrtAdaptiveBlocksPrecompute" + oss.str();
+		return "SqBlPre" + oss.str();
 	}
 
 	static size_t max_n() { return SIZE_MAX; }
@@ -1025,27 +1025,6 @@ struct SqrtAdaptiveBlocksPrecompute
 // TODO: Implement the RMQ interface for additional data structures.
 // -------------------------------------------------------------
 
-// Calls bench<AdaptiveBlocksPrecompute<Cs>>(input) for every Cs in the pack.
-template <size_t... Cs>
-void bench_ccomp_pack(const struct Input &input);
-
-// Generates Cs = Start, Start+Step, ..., up to and including End,
-// then forwards to bench_ccomp_pack.
-template <size_t Start, size_t End, size_t Step, size_t... Is>
-void bench_ccomp_range_impl(const struct Input &input, std::index_sequence<Is...>)
-{
-	bench_ccomp_pack<(Start + Is * Step)...>(input);
-}
-
-template <size_t Start, size_t End, size_t Step = 1>
-void bench_ccomp_range(const struct Input &input)
-{
-	static_assert(End >= Start && (End - Start) % Step == 0,
-				  "range must be evenly divisible by step");
-	constexpr size_t Count = (End - Start) / Step + 1;
-	bench_ccomp_range_impl<Start, End, Step>(input, std::make_index_sequence<Count>{});
-}
-
 struct Input
 {
 	std::vector<uint64_t> data;
@@ -1102,12 +1081,6 @@ void bench(const Input &input)
 			  << elapsed << "ns/q\n";
 }
 
-template <size_t... Cs>
-void bench_ccomp_pack(const Input &input)
-{
-	(bench<AdaptiveBlocksPrecompute<Cs>>(input), ...);
-}
-
 int main(int argc, char *argv[])
 {
 	if (argc < 2)
@@ -1142,84 +1115,41 @@ int main(int argc, char *argv[])
 	{
 		/*
 
+
 		bench<OnTheFlyNaive>(input);
 		bench<PrecomputedNaive>(input);
 		bench<SparseTable>(input);
 		bench<SegmentTree>(input);
+		bench<Blocks<64>>(input);
+		if (input.data.size() >= 10000000)
+		{
+			bench<AdaptiveBlocks<225>>(input);
+		}
 
 		*/
 
+
+		/*
+
+
+
+		these for testing out the block size it turns out fixed64 is good for < 1000000
+		anything over 1000000 2.25 works
 		bench<Blocks<16>>(input);
 		bench<Blocks<32>>(input);
 		bench<Blocks<64>>(input);
 		bench<Blocks<128>>(input);
-
 		bench<AdaptiveBlocks<100>>(input);
-
 		bench<AdaptiveBlocks<200>>(input);
-
+		bench<AdaptiveBlocks<225>>(input);
+		bench<AdaptiveBlocks<250>>(input);
+		bench<AdaptiveBlocks<275>>(input);
 		bench<AdaptiveBlocks<300>>(input);
-
 		bench<AdaptiveBlocks<400>>(input);
-
 		bench<AdaptiveBlocks<500>>(input);
 
-		/*
-
-		bench<AdaptiveBlocks<100>>(input);
-		bench<AdaptiveBlocksPrecompute<100>>(input);
-		bench<SqrtAdaptiveBlocksPrecompute<100>>(input);
-		bench<Blocks<2>>(input);
-		bench<BlocksPrecompute<2>>(input);
-		bench<BlocksPrecompute<4>>(input);
-		bench<BlocksPrecompute<8>>(input);
-		bench<BlocksPrecompute<16>>(input);
-		bench<BlocksPrecompute<32>>(input);
-			bench<BlocksPrecompute<64>>(input);
-			bench<BlocksPrecompute<128>>(input);
-			bench<BlocksPrecompute<256>>(input);
-			bench<BlocksPrecompute<512>>(input);
-			bench<BlocksPrecompute<2048>>(input);
-			bench<BlocksPrecompute<4096>>(input);
-			bench<BlocksPrecompute<4096*2>>(input);
-			bench<BlocksPrecompute<4096*4>>(input);
-			bench<BlocksPrecompute<4096*8>>(input);
-			bench<BlocksPrecompute<4096*16>>(input);
-
-			bench<BlocksPrecompute<4096*32>>(input);
-			bench<AdaptiveBlocksPrecompute<100>>(input);
-			bench<AdaptiveBlocksPrecompute<300>>(input);
-			bench<AdaptiveBlocksPrecompute<1000>>(input);
-			bench<AdaptiveBlocksPrecompute<3000>>(input);
-			bench<AdaptiveBlocksPrecompute<10000>>(input);
-
-			bench<AdaptiveBlocksPrecompute<100000>>(input);
-			bench<Blocks<4>>(input);
-			bench<Blocks<8>>(input);
-			bench<Blocks<16>>(input);
-			bench<Blocks<32>>(input);
-			bench<Blocks<128>>(input);
-			bench<Blocks<256>>(input);
-			bench<Blocks<512>>(input);
-			bench<Blocks<1024>>(input);
-			bench<AdaptiveBlocks<50>>(input);
-			bench<AdaptiveBlocks<100>>(input);
-			bench<AdaptiveBlocks<150>>(input);
-			bench<AdaptiveBlocks<200>>(input);
-			bench<AdaptiveBlocks<250>>(input);
-			bench<AdaptiveBlocks<300>>(input);
-			bench<AdaptiveBlocks<350>>(input);
-			bench<AdaptiveBlocks<400>>(input);
-			bench<AdaptiveBlocks<450>>(input);
-			bench<AdaptiveBlocks<500>>(input);
 
 
-
-			bench<BlocksPrecompute<2>>(input);
-			bench<BlocksPrecompute<4>>(input);
-			bench<BlocksPrecompute<8>>(input);
-			bench<BlocksPrecompute<16>>(input);
-			bench<BlocksPrecompute<32>>(input);
 		*/
 	}
 
