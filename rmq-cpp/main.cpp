@@ -854,15 +854,6 @@ struct SqrtAdaptiveBlocksPrecompute
 			size_t start = block * rmq.blockSize;
 			size_t end = std::min(start + rmq.blockSize, n);
 
-			// block minimum
-			size_t blockMin = start;
-			for (size_t i = start + 1; i < end; ++i)
-			{
-				if (data[i] < data[blockMin])
-					blockMin = i;
-			}
-			rmq.table[0][block] = blockMin;
-
 			// prefix minima
 			rmq.prefixMin[start] = static_cast<uint32_t>(start);
 			for (size_t i = start + 1; i < end; ++i)
@@ -873,6 +864,9 @@ struct SqrtAdaptiveBlocksPrecompute
 				else
 					rmq.prefixMin[i] = prev;
 			}
+
+			// block minimum == prefix minimum over the whole block
+			rmq.table[0][block] = static_cast<size_t>(rmq.prefixMin[end - 1]);
 
 			// suffix minima
 			rmq.suffixMin[end - 1] = static_cast<uint32_t>(end - 1);
@@ -912,36 +906,26 @@ struct SqrtAdaptiveBlocksPrecompute
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		// same block
-		if (l / blockSize == r / blockSize)
+		const uint64_t *p = data->data();
+		const size_t bl = l / blockSize, br = r / blockSize;
+
+		if (bl == br)
 		{
-			uint64_t ans = UINT64_MAX;
-			for (size_t i = l; i <= r; ++i)
-				ans = std::min(ans, (*data)[i]);
+			uint64_t ans = p[l];
+			for (size_t i = l + 1; i <= r; ++i)
+				ans = std::min(ans, p[i]);
 			return ans;
 		}
 
-		uint64_t leftMin = (*data)[suffixMin[l]];
-		uint64_t rightMin = (*data)[prefixMin[r]];
-		uint64_t middleMin = UINT64_MAX;
+		uint64_t ans = std::min(p[suffixMin[l]], p[prefixMin[r]]);
 
-		size_t lp = (l + blockSize - 1) / blockSize;
-		size_t rp = r / blockSize;
-
-		if (lp < rp)
+		const size_t lo = bl + 1, hi = br - 1;
+		if (lo <= hi)
 		{
-			--rp;
-
-			size_t len = rp - lp + 1;
-			size_t k = floor_log2(len);
-
-			size_t leftIdx = table[k][lp];
-			size_t rightIdx = table[k][rp - (1ULL << k) + 1];
-
-			middleMin = std::min((*data)[leftIdx], (*data)[rightIdx]);
+			const size_t k = floor_log2(hi - lo + 1);
+			ans = std::min(ans, std::min(p[table[k][lo]], p[table[k][hi + 1 - (1ULL << k)]]));
 		}
-
-		return std::min({leftMin, middleMin, rightMin});
+		return ans;
 	}
 
 	size_t space() const
@@ -955,6 +939,377 @@ struct SqrtAdaptiveBlocksPrecompute
 
 		total += prefixMin.capacity() * sizeof(uint32_t);
 		total += suffixMin.capacity() * sizeof(uint32_t);
+
+		return total;
+	}
+};
+
+template <size_t BlockSize>
+struct Cartesian
+{
+	static_assert(BlockSize >= 1 && BlockSize <= 32,
+				  "the Cartesian-tree code is 2*BlockSize bits and must fit in a uint64_t");
+
+	static std::string name() { return "FiBlCt" + std::to_string(BlockSize); }
+
+	static size_t max_n() { return SIZE_MAX; }
+
+	const std::vector<uint64_t> *data = nullptr;
+
+	std::vector<std::vector<size_t>> table;
+
+	std::vector<uint32_t> blockShape; // block -> row in `lookup`
+	std::vector<uint8_t> lookup;	  // shape row -> argmin offset of every in-block query
+
+	static constexpr size_t QueriesPerBlock = BlockSize * (BlockSize + 1) / 2;
+
+	// Triangular index of the in-block query [a, b], with 0 <= a <= b < BlockSize.
+	static size_t inBlockIndex(size_t a, size_t b)
+	{
+		return a * BlockSize - (a * (a - 1)) / 2 + (b - a);
+	}
+
+	static Cartesian build(const std::vector<uint64_t> &data)
+	{
+		Cartesian rmq;
+		rmq.data = &data;
+
+		size_t n = data.size();
+		size_t amountOfBlocks = (n + BlockSize - 1) / BlockSize;
+
+		size_t numberOfLevels = 0;
+		for (size_t x = amountOfBlocks; x > 0; x >>= 1)
+			++numberOfLevels;
+
+		rmq.table.resize(numberOfLevels);
+		rmq.table[0].resize(amountOfBlocks);
+		rmq.blockShape.resize(amountOfBlocks);
+
+		// Build-time only: maps a shape code to the row that already holds its answers.
+		std::unordered_map<uint64_t, uint32_t> rowOfCode;
+
+		uint64_t stack[BlockSize];
+
+		// level 0 + Cartesian tree shapes
+		for (size_t block = 0; block < amountOfBlocks; ++block)
+		{
+			size_t start = block * BlockSize;
+			size_t end = std::min(start + BlockSize, n);
+			size_t len = end - start;
+
+			// Shape code: one bit per stack operation, 1 for a push and 0 for a pop.
+			// Positions past `end` count as +inf; a strict `>` never pops for them, so
+			// a short final block still yields a well-formed 2*BlockSize-bit code.
+			uint64_t code = 0;
+			size_t top = 0;
+
+			for (size_t i = 0; i < BlockSize; ++i)
+			{
+				uint64_t v = (start + i < end) ? data[start + i] : UINT64_MAX;
+
+				while (top > 0 && stack[top - 1] > v)
+				{
+					--top;
+					code <<= 1;
+				}
+
+				stack[top++] = v;
+				code = (code << 1) | 1;
+			}
+
+			code <<= top; // flush the stack: `top` remaining pops
+
+			auto it = rowOfCode.find(code);
+			uint32_t row;
+
+			if (it != rowOfCode.end())
+			{
+				row = it->second;
+			}
+			else
+			{
+				row = static_cast<uint32_t>(rmq.lookup.size() / QueriesPerBlock);
+				rowOfCode.emplace(code, row);
+				rmq.lookup.resize(rmq.lookup.size() + QueriesPerBlock);
+
+				// All blocks with this shape share these answers, so filling the row
+				// from the current block's own values is enough.
+				for (size_t a = 0; a < BlockSize; ++a)
+				{
+					size_t argmin = a;
+					uint64_t best = (start + a < end) ? data[start + a] : UINT64_MAX;
+
+					for (size_t b = a; b < BlockSize; ++b)
+					{
+						uint64_t v = (start + b < end) ? data[start + b] : UINT64_MAX;
+
+						if (v < best)
+						{
+							best = v;
+							argmin = b;
+						}
+
+						rmq.lookup[row * QueriesPerBlock + inBlockIndex(a, b)] =
+							static_cast<uint8_t>(argmin);
+					}
+				}
+			}
+
+			rmq.blockShape[block] = row;
+			rmq.table[0][block] =
+				start + rmq.lookup[row * QueriesPerBlock + inBlockIndex(0, len - 1)];
+		}
+
+		// sparse table
+		for (size_t level = 1; level < numberOfLevels; ++level)
+		{
+			size_t len = 1ULL << level;
+			size_t half = len >> 1;
+			size_t L = amountOfBlocks + 1 - len;
+
+			rmq.table[level].resize(L);
+
+			for (size_t j = 0; j < L; ++j)
+			{
+				size_t left = rmq.table[level - 1][j];
+				size_t right = rmq.table[level - 1][j + half];
+
+				if (data[left] <= data[right])
+					rmq.table[level][j] = left;
+				else
+					rmq.table[level][j] = right;
+			}
+		}
+
+		return rmq;
+	}
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		const uint64_t *p = data->data();
+		const size_t bl = l / BlockSize, br = r / BlockSize;
+		const size_t ls = bl * BlockSize;
+
+		// unlike BlocksPrecompute this case is O(1) too
+		if (bl == br)
+			return p[ls + lookup[blockShape[bl] * QueriesPerBlock +
+								 inBlockIndex(l - ls, r - ls)]];
+
+		const size_t rs = br * BlockSize;
+
+		uint64_t ans = std::min(
+			p[ls + lookup[blockShape[bl] * QueriesPerBlock +
+						  inBlockIndex(l - ls, BlockSize - 1)]],
+			p[rs + lookup[blockShape[br] * QueriesPerBlock + inBlockIndex(0, r - rs)]]);
+
+		const size_t lo = bl + 1, hi = br - 1;
+		if (lo <= hi)
+		{
+			const size_t k = floor_log2(hi - lo + 1);
+			ans = std::min(ans, std::min(p[table[k][lo]], p[table[k][hi + 1 - (1ULL << k)]]));
+		}
+		return ans;
+	}
+
+	size_t space() const
+	{
+		size_t total = sizeof(*this);
+
+		total += table.capacity() * sizeof(std::vector<size_t>);
+
+		for (const auto &level : table)
+			total += level.capacity() * sizeof(size_t);
+
+		total += blockShape.capacity() * sizeof(uint32_t);
+		total += lookup.capacity() * sizeof(uint8_t);
+
+		return total;
+	}
+};
+
+template <size_t CCOMP>
+struct AdaptiveCartesian
+{
+	size_t blockSize;
+	size_t queriesPerBlock;
+
+	static std::string name()
+	{
+		std::ostringstream oss;
+		oss << std::fixed << std::setprecision(2)
+			<< (CCOMP / 100.0);
+		return "AdBlCt" + oss.str();
+	}
+
+	static size_t max_n() { return SIZE_MAX; }
+
+	const std::vector<uint64_t> *data = nullptr;
+
+	std::vector<std::vector<size_t>> table;
+
+	std::vector<uint32_t> blockShape;
+	std::vector<uint8_t> lookup;
+
+	size_t inBlockIndex(size_t a, size_t b) const
+	{
+		return a * blockSize - (a * (a - 1)) / 2 + (b - a);
+	}
+
+	static AdaptiveCartesian build(const std::vector<uint64_t> &data)
+	{
+		AdaptiveCartesian rmq;
+
+		constexpr double C = CCOMP / 100.0;
+
+		// The slides use s = (1/2) log_4 n = (1/4) log_2 n, i.e. C = 0.25.
+		// Clamped to 32 so that the 2s-bit shape code still fits in a uint64_t.
+		rmq.blockSize = std::min<size_t>(
+			32,
+			std::max<size_t>(1, static_cast<size_t>(C * std::log2(data.size()))));
+		rmq.queriesPerBlock = rmq.blockSize * (rmq.blockSize + 1) / 2;
+		rmq.data = &data;
+
+		size_t n = data.size();
+		size_t amountOfBlocks = (n + rmq.blockSize - 1) / rmq.blockSize;
+
+		size_t numberOfLevels = 0;
+		for (size_t x = amountOfBlocks; x > 0; x >>= 1)
+			++numberOfLevels;
+
+		rmq.table.resize(numberOfLevels);
+		rmq.table[0].resize(amountOfBlocks);
+		rmq.blockShape.resize(amountOfBlocks);
+
+		std::unordered_map<uint64_t, uint32_t> rowOfCode;
+
+		std::vector<uint64_t> stack(rmq.blockSize);
+
+		// level 0 + Cartesian tree shapes
+		for (size_t block = 0; block < amountOfBlocks; ++block)
+		{
+			size_t start = block * rmq.blockSize;
+			size_t end = std::min(start + rmq.blockSize, n);
+			size_t len = end - start;
+
+			uint64_t code = 0;
+			size_t top = 0;
+
+			for (size_t i = 0; i < rmq.blockSize; ++i)
+			{
+				uint64_t v = (start + i < end) ? data[start + i] : UINT64_MAX;
+
+				while (top > 0 && stack[top - 1] > v)
+				{
+					--top;
+					code <<= 1;
+				}
+
+				stack[top++] = v;
+				code = (code << 1) | 1;
+			}
+
+			code <<= top;
+
+			auto it = rowOfCode.find(code);
+			uint32_t row;
+
+			if (it != rowOfCode.end())
+			{
+				row = it->second;
+			}
+			else
+			{
+				row = static_cast<uint32_t>(rmq.lookup.size() / rmq.queriesPerBlock);
+				rowOfCode.emplace(code, row);
+				rmq.lookup.resize(rmq.lookup.size() + rmq.queriesPerBlock);
+
+				for (size_t a = 0; a < rmq.blockSize; ++a)
+				{
+					size_t argmin = a;
+					uint64_t best = (start + a < end) ? data[start + a] : UINT64_MAX;
+
+					for (size_t b = a; b < rmq.blockSize; ++b)
+					{
+						uint64_t v = (start + b < end) ? data[start + b] : UINT64_MAX;
+
+						if (v < best)
+						{
+							best = v;
+							argmin = b;
+						}
+
+						rmq.lookup[row * rmq.queriesPerBlock + rmq.inBlockIndex(a, b)] =
+							static_cast<uint8_t>(argmin);
+					}
+				}
+			}
+
+			rmq.blockShape[block] = row;
+			rmq.table[0][block] =
+				start + rmq.lookup[row * rmq.queriesPerBlock + rmq.inBlockIndex(0, len - 1)];
+		}
+
+		// sparse table
+		for (size_t level = 1; level < numberOfLevels; ++level)
+		{
+			size_t len = 1ULL << level;
+			size_t half = len >> 1;
+			size_t L = amountOfBlocks + 1 - len;
+
+			rmq.table[level].resize(L);
+
+			for (size_t j = 0; j < L; ++j)
+			{
+				size_t left = rmq.table[level - 1][j];
+				size_t right = rmq.table[level - 1][j + half];
+
+				if (data[left] <= data[right])
+					rmq.table[level][j] = left;
+				else
+					rmq.table[level][j] = right;
+			}
+		}
+
+		return rmq;
+	}
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		const uint64_t *p = data->data();
+		const size_t bl = l / blockSize, br = r / blockSize;
+		const size_t ls = bl * blockSize;
+
+		if (bl == br)
+			return p[ls + lookup[blockShape[bl] * queriesPerBlock +
+								 inBlockIndex(l - ls, r - ls)]];
+
+		const size_t rs = br * blockSize;
+
+		uint64_t ans = std::min(
+			p[ls + lookup[blockShape[bl] * queriesPerBlock +
+						  inBlockIndex(l - ls, blockSize - 1)]],
+			p[rs + lookup[blockShape[br] * queriesPerBlock + inBlockIndex(0, r - rs)]]);
+
+		const size_t lo = bl + 1, hi = br - 1;
+		if (lo <= hi)
+		{
+			const size_t k = floor_log2(hi - lo + 1);
+			ans = std::min(ans, std::min(p[table[k][lo]], p[table[k][hi + 1 - (1ULL << k)]]));
+		}
+		return ans;
+	}
+
+	size_t space() const
+	{
+		size_t total = sizeof(*this);
+
+		total += table.capacity() * sizeof(std::vector<size_t>);
+
+		for (const auto &level : table)
+			total += level.capacity() * sizeof(size_t);
+
+		total += blockShape.capacity() * sizeof(uint32_t);
+		total += lookup.capacity() * sizeof(uint8_t);
 
 		return total;
 	}
@@ -1048,16 +1403,13 @@ int main(int argc, char *argv[])
 
 	for (const auto &input : inputs)
 	{
-		/*
+		/**/
 		bench<OnTheFlyNaive>(input);
 		bench<PrecomputedNaive>(input);
 		bench<SparseTable>(input);
 		bench<SegmentTree>(input);
 		bench<Blocks<64>>(input);
 		bench<SqrtAdaptiveBlocksPrecompute<300>>(input);
-
-
-		*/
 
 		/* comparrison for the final decision for precompute blocks comparing fixed size - C*log(n) * C*√n
 		3*√n wins
