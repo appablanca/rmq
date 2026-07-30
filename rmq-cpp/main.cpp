@@ -11,10 +11,11 @@
 #include <stdexcept>
 #include <limits>
 #include <utility>
+#include <cmath>
 
 inline size_t floor_log2(size_t x)
 {
-	return 8 * sizeof(size_t) - 1 - __builtin_clzll(x);
+	return 63 - static_cast<size_t>(__builtin_clzll(static_cast<unsigned long long>(x)));
 }
 // RMQ interface (duck-typed via templates):
 //
@@ -26,10 +27,8 @@ inline size_t floor_log2(size_t x)
 
 struct OnTheFlyNaive
 {
-	static std::string name() { return "OTFNai"; }
-	// NOTE: Improved implementations should simply return size_t::MAX.
+	static std::string name() { return "NaiOtf"; }
 	static size_t max_n() { return 10'000; }
-
 	const std::vector<uint64_t> *data;
 
 	static OnTheFlyNaive build(const std::vector<uint64_t> &data) { return {&data}; }
@@ -47,7 +46,7 @@ struct OnTheFlyNaive
 
 struct PrecomputedNaive
 {
-	static std::string name() { return "PreNai"; }
+	static std::string name() { return "NaiPre"; }
 
 	static size_t max_n() { return 10'000; }
 
@@ -232,7 +231,7 @@ struct SegmentTree
 	size_t space() const
 	{
 
-		size_t bytes = 0;
+		size_t bytes = sizeof(*this);
 
 		for (const auto &row : tree)
 		{
@@ -368,49 +367,36 @@ struct Blocks
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		uint64_t leftMin = UINT64_MAX;
-		uint64_t middleMin = UINT64_MAX;
-		uint64_t rightMin = UINT64_MAX;
+		const uint64_t *p = data->data();
+		const size_t bl = l / BlockSize, br = r / BlockSize;
 
-		// if same block
-		if (l / BlockSize == r / BlockSize)
+		if (bl == br)
 		{
-			uint64_t ans = UINT64_MAX;
-			for (size_t i = l; i <= r; ++i)
-				ans = std::min(ans, (*data)[i]);
+			uint64_t ans = p[l];
+			for (size_t i = l + 1; i <= r; ++i)
+				ans = std::min(ans, p[i]);
 			return ans;
 		}
-		// left query
-		size_t leftEnd = std::min(((l / BlockSize) + 1) * BlockSize - 1, r);
-		for (size_t i = l; i <= leftEnd; ++i)
-			leftMin = std::min(leftMin, (*data)[i]);
-		// middle query
-		size_t lp = (l + BlockSize - 1) / BlockSize;
 
-		size_t rp = r / BlockSize;
-		if (lp < rp)
+		uint64_t ans = p[l]; // tail of block bl
+		for (size_t i = l + 1; i < (bl + 1) * BlockSize; ++i)
+			ans = std::min(ans, p[i]);
+
+		for (size_t i = br * BlockSize; i <= r; ++i)
+			ans = std::min(ans, p[i]);
+
+		const size_t lo = bl + 1, hi = br - 1;
+		if (lo <= hi)
 		{
-			--rp;
-			size_t len = rp - lp + 1;
-			size_t k = floor_log2(len);
-			size_t leftIdx = table[k][lp];
-			size_t rightIdx = table[k][rp - (1ULL << k) + 1];
-			middleMin = std::min((*data)[leftIdx], (*data)[rightIdx]);
+			const size_t k = floor_log2(hi - lo + 1);
+			ans = std::min(ans, std::min(p[table[k][lo]], p[table[k][hi + 1 - (1ULL << k)]]));
 		}
-
-		// right query
-		size_t lastBlock = r / BlockSize;
-
-		size_t rightStart = lastBlock * BlockSize;
-		for (size_t i = rightStart; i <= r; ++i)
-			rightMin = std::min(rightMin, (*data)[i]);
-
-		return std::min({leftMin, middleMin, rightMin});
+		return ans;
 	}
 
 	size_t space() const
 	{
-		size_t total = 0;
+		size_t total = sizeof(*this);
 
 		total += table.capacity() * sizeof(std::vector<size_t>);
 
@@ -504,50 +490,31 @@ struct AdaptiveBlocks
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		uint64_t leftMin = UINT64_MAX;
-		uint64_t middleMin = UINT64_MAX;
-		uint64_t rightMin = UINT64_MAX;
+		const uint64_t *p = data->data();
+		const size_t bl = l / blockSize, br = r / blockSize;
 
-		// same block
-		if (l / blockSize == r / blockSize)
+		if (bl == br)
 		{
-			uint64_t ans = UINT64_MAX;
-			for (size_t i = l; i <= r; ++i)
-				ans = std::min(ans, (*data)[i]);
+			uint64_t ans = p[l];
+			for (size_t i = l + 1; i <= r; ++i)
+				ans = std::min(ans, p[i]);
 			return ans;
 		}
 
-		// left partial block
-		size_t leftEnd = std::min(((l / blockSize) + 1) * blockSize - 1, r);
+		uint64_t ans = p[l]; // tail of block bl
+		for (size_t i = l + 1; i < (bl + 1) * blockSize; ++i)
+			ans = std::min(ans, p[i]);
 
-		for (size_t i = l; i <= leftEnd; ++i)
-			leftMin = std::min(leftMin, (*data)[i]);
+		for (size_t i = br * blockSize; i <= r; ++i)
+			ans = std::min(ans, p[i]);
 
-		// middle full blocks
-		size_t lp = (l + blockSize - 1) / blockSize;
-		size_t rp = r / blockSize;
-
-		if (lp < rp)
+		const size_t lo = bl + 1, hi = br - 1;
+		if (lo <= hi)
 		{
-			--rp;
-
-			size_t len = rp - lp + 1;
-			size_t k = floor_log2(len);
-
-			size_t leftIdx = table[k][lp];
-			size_t rightIdx = table[k][rp - (1ULL << k) + 1];
-
-			middleMin = std::min((*data)[leftIdx], (*data)[rightIdx]);
+			const size_t k = floor_log2(hi - lo + 1);
+			ans = std::min(ans, std::min(p[table[k][lo]], p[table[k][hi + 1 - (1ULL << k)]]));
 		}
-
-		// right partial block
-		size_t lastBlock = r / blockSize;
-		size_t rightStart = lastBlock * blockSize;
-
-		for (size_t i = rightStart; i <= r; ++i)
-			rightMin = std::min(rightMin, (*data)[i]);
-
-		return std::min({leftMin, middleMin, rightMin});
+		return ans;
 	}
 
 	size_t space() const
@@ -603,15 +570,6 @@ struct BlocksPrecompute
 			size_t start = block * BlockSize;
 			size_t end = std::min(start + BlockSize, n);
 
-			// block minimum
-			size_t blockMin = start;
-			for (size_t i = start + 1; i < end; ++i)
-			{
-				if (data[i] < data[blockMin])
-					blockMin = i;
-			}
-			rmq.table[0][block] = blockMin;
-
 			// prefix minima
 			rmq.prefixMin[start] = static_cast<uint32_t>(start);
 			for (size_t i = start + 1; i < end; ++i)
@@ -622,6 +580,9 @@ struct BlocksPrecompute
 				else
 					rmq.prefixMin[i] = prev;
 			}
+
+			// block minimum == prefix minimum over the whole block
+			rmq.table[0][block] = static_cast<size_t>(rmq.prefixMin[end - 1]);
 
 			// suffix minima
 			rmq.suffixMin[end - 1] = static_cast<uint32_t>(end - 1);
@@ -634,7 +595,6 @@ struct BlocksPrecompute
 					rmq.suffixMin[i - 1] = next;
 			}
 		}
-
 		// sparse table
 		for (size_t level = 1; level < numberOfLevels; ++level)
 		{
@@ -659,43 +619,33 @@ struct BlocksPrecompute
 		return rmq;
 	}
 
+	// BlocksPrecompute — identical except the two partial ends are O(1)
 	uint64_t query(size_t l, size_t r) const
 	{
-		// same block
-		if (l / BlockSize == r / BlockSize)
+		const uint64_t *p = data->data();
+		const size_t bl = l / BlockSize, br = r / BlockSize;
+
+		if (bl == br)
 		{
-			uint64_t ans = UINT64_MAX;
-			for (size_t i = l; i <= r; ++i)
-				ans = std::min(ans, (*data)[i]);
+			uint64_t ans = p[l];
+			for (size_t i = l + 1; i <= r; ++i)
+				ans = std::min(ans, p[i]);
 			return ans;
 		}
 
-		uint64_t leftMin = (*data)[suffixMin[l]];
-		uint64_t rightMin = (*data)[prefixMin[r]];
-		uint64_t middleMin = UINT64_MAX;
+		uint64_t ans = std::min(p[suffixMin[l]], p[prefixMin[r]]);
 
-		size_t lp = (l + BlockSize - 1) / BlockSize;
-		size_t rp = r / BlockSize;
-
-		if (lp < rp)
+		const size_t lo = bl + 1, hi = br - 1;
+		if (lo <= hi)
 		{
-			--rp;
-
-			size_t len = rp - lp + 1;
-			size_t k = floor_log2(len);
-
-			size_t leftIdx = table[k][lp];
-			size_t rightIdx = table[k][rp - (1ULL << k) + 1];
-
-			middleMin = std::min((*data)[leftIdx], (*data)[rightIdx]);
+			const size_t k = floor_log2(hi - lo + 1);
+			ans = std::min(ans, std::min(p[table[k][lo]], p[table[k][hi + 1 - (1ULL << k)]]));
 		}
-
-		return std::min({leftMin, middleMin, rightMin});
+		return ans;
 	}
-
 	size_t space() const
 	{
-		size_t total = 0;
+		size_t total = sizeof(*this);
 
 		total += table.capacity() * sizeof(std::vector<size_t>);
 
@@ -744,6 +694,7 @@ struct AdaptiveBlocksPrecompute
 		rmq.data = &data;
 
 		size_t n = data.size();
+
 		size_t amountOfBlocks = (n + rmq.blockSize - 1) / rmq.blockSize;
 
 		size_t numberOfLevels = 0;
@@ -762,15 +713,6 @@ struct AdaptiveBlocksPrecompute
 			size_t start = block * rmq.blockSize;
 			size_t end = std::min(start + rmq.blockSize, n);
 
-			// block minimum
-			size_t blockMin = start;
-			for (size_t i = start + 1; i < end; ++i)
-			{
-				if (data[i] < data[blockMin])
-					blockMin = i;
-			}
-			rmq.table[0][block] = blockMin;
-
 			// prefix minima
 			rmq.prefixMin[start] = static_cast<uint32_t>(start);
 			for (size_t i = start + 1; i < end; ++i)
@@ -782,8 +724,11 @@ struct AdaptiveBlocksPrecompute
 					rmq.prefixMin[i] = prev;
 			}
 
+			// block minimum == prefix minimum over the whole block
+			rmq.table[0][block] = static_cast<size_t>(rmq.prefixMin[end - 1]);
+
 			// suffix minima
-			rmq.suffixMin[end - 1] =  static_cast<uint32_t>(end - 1);
+			rmq.suffixMin[end - 1] = static_cast<uint32_t>(end - 1);
 			for (size_t i = end - 1; i > start; --i)
 			{
 				uint32_t next = rmq.suffixMin[i];
@@ -793,7 +738,6 @@ struct AdaptiveBlocksPrecompute
 					rmq.suffixMin[i - 1] = next;
 			}
 		}
-
 		// sparse table
 		for (size_t level = 1; level < numberOfLevels; ++level)
 		{
@@ -820,41 +764,31 @@ struct AdaptiveBlocksPrecompute
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		// same block
-		if (l / blockSize == r / blockSize)
+		const uint64_t *p = data->data();
+		const size_t bl = l / blockSize, br = r / blockSize;
+
+		if (bl == br)
 		{
-			uint64_t ans = UINT64_MAX;
-			for (size_t i = l; i <= r; ++i)
-				ans = std::min(ans, (*data)[i]);
+			uint64_t ans = p[l];
+			for (size_t i = l + 1; i <= r; ++i)
+				ans = std::min(ans, p[i]);
 			return ans;
 		}
 
-		uint64_t leftMin = (*data)[suffixMin[l]];
-		uint64_t rightMin = (*data)[prefixMin[r]];
-		uint64_t middleMin = UINT64_MAX;
+		uint64_t ans = std::min(p[suffixMin[l]], p[prefixMin[r]]);
 
-		size_t lp = (l + blockSize - 1) / blockSize;
-		size_t rp = r / blockSize;
-
-		if (lp < rp)
+		const size_t lo = bl + 1, hi = br - 1;
+		if (lo <= hi)
 		{
-			--rp;
-
-			size_t len = rp - lp + 1;
-			size_t k = floor_log2(len);
-
-			size_t leftIdx = table[k][lp];
-			size_t rightIdx = table[k][rp - (1ULL << k) + 1];
-
-			middleMin = std::min((*data)[leftIdx], (*data)[rightIdx]);
+			const size_t k = floor_log2(hi - lo + 1);
+			ans = std::min(ans, std::min(p[table[k][lo]], p[table[k][hi + 1 - (1ULL << k)]]));
 		}
-
-		return std::min({leftMin, middleMin, rightMin});
+		return ans;
 	}
 
 	size_t space() const
 	{
-		size_t total = 0;
+		size_t total = sizeof(*this);
 
 		total += table.capacity() * sizeof(std::vector<size_t>);
 
@@ -1012,7 +946,7 @@ struct SqrtAdaptiveBlocksPrecompute
 
 	size_t space() const
 	{
-		size_t total = 0;
+		size_t total = sizeof(*this);
 
 		total += table.capacity() * sizeof(std::vector<size_t>);
 
@@ -1025,10 +959,6 @@ struct SqrtAdaptiveBlocksPrecompute
 		return total;
 	}
 };
-
-// -------------------------------------------------------------
-// TODO: Implement the RMQ interface for additional data structures.
-// -------------------------------------------------------------
 
 struct Input
 {
@@ -1124,11 +1054,51 @@ int main(int argc, char *argv[])
 		bench<SparseTable>(input);
 		bench<SegmentTree>(input);
 		bench<Blocks<64>>(input);
-		if (input.data.size() >= 10000000)
-		{
-			bench<AdaptiveBlocks<225>>(input);
-		}
+		bench<SqrtAdaptiveBlocksPrecompute<300>>(input);
+
+
 		*/
+
+		/* comparrison for the final decision for precompute blocks comparing fixed size - C*log(n) * C*√n
+		3*√n wins
+		bench<SqrtAdaptiveBlocksPrecompute<200>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<250>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<300>>(input);
+
+		bench<BlocksPrecompute<2048 * 2 * 2>>(input);
+		bench<BlocksPrecompute<2048 * 2 * 2 * 2>>(input);
+		bench<BlocksPrecompute<2048 * 2 * 2 * 2 * 2>>(input);
+
+		bench<AdaptiveBlocksPrecompute<15000>>(input);
+		bench<AdaptiveBlocksPrecompute<17500>>(input);
+		bench<AdaptiveBlocksPrecompute<20000>>(input);
+		*/
+
+		/* data that was used to asses C*log(n) size for precompute blocks
+		bench<AdaptiveBlocksPrecompute<100>>(input);
+		bench<AdaptiveBlocksPrecompute<200>>(input);
+		bench<AdaptiveBlocksPrecompute<300>>(input);
+		bench<AdaptiveBlocksPrecompute<400>>(input);
+		bench<AdaptiveBlocksPrecompute<500>>(input);
+		bench<AdaptiveBlocksPrecompute<600>>(input);
+		bench<AdaptiveBlocksPrecompute<700>>(input);
+		bench<AdaptiveBlocksPrecompute<800>>(input);
+		bench<AdaptiveBlocksPrecompute<900>>(input);
+		bench<AdaptiveBlocksPrecompute<1000>>(input);
+		bench<AdaptiveBlocksPrecompute<1500>>(input);
+		bench<AdaptiveBlocksPrecompute<2000>>(input);
+		bench<AdaptiveBlocksPrecompute<3000>>(input);
+		bench<AdaptiveBlocksPrecompute<4000>>(input);
+		bench<AdaptiveBlocksPrecompute<5000>>(input);
+		bench<AdaptiveBlocksPrecompute<7500>>(input);
+		bench<AdaptiveBlocksPrecompute<10000>>(input);
+		bench<AdaptiveBlocksPrecompute<12500>>(input);
+		bench<AdaptiveBlocksPrecompute<15000>>(input);
+		bench<AdaptiveBlocksPrecompute<17500>>(input);
+		bench<AdaptiveBlocksPrecompute<20000>>(input);
+		*/
+
+		/* data that was used to asses fixed size for precompute blocks
 		bench<BlocksPrecompute<2>>(input);
 		bench<BlocksPrecompute<4>>(input);
 		bench<BlocksPrecompute<8>>(input);
@@ -1145,37 +1115,21 @@ int main(int argc, char *argv[])
 		bench<BlocksPrecompute<2048 * 2 * 2 * 2>>(input);
 		bench<BlocksPrecompute<2048 * 2 * 2 * 2 * 2>>(input);
 		bench<BlocksPrecompute<2048 * 2 * 2 * 2 * 2 * 2>>(input);
-		bench<BlocksPrecompute<2048 * 2 * 2 * 2 * 2 * 2 * 2>>(input);
+		*/
 
-		bench<AdaptiveBlocksPrecompute<100>>(input);
-		bench<AdaptiveBlocksPrecompute<200>>(input);
-		bench<AdaptiveBlocksPrecompute<300>>(input);
-		bench<AdaptiveBlocksPrecompute<400>>(input);
-		bench<AdaptiveBlocksPrecompute<500>>(input);
-		bench<AdaptiveBlocksPrecompute<600>>(input);
-		bench<AdaptiveBlocksPrecompute<700>>(input);
-		bench<AdaptiveBlocksPrecompute<800>>(input);
-		bench<AdaptiveBlocksPrecompute<900>>(input);
-		bench<AdaptiveBlocksPrecompute<1000>>(input);
-		bench<AdaptiveBlocksPrecompute<2000>>(input);
-		bench<AdaptiveBlocksPrecompute<3000>>(input);
-		bench<AdaptiveBlocksPrecompute<4000>>(input);
-		bench<AdaptiveBlocksPrecompute<5000>>(input);
-		bench<AdaptiveBlocksPrecompute<6000>>(input);
-		bench<AdaptiveBlocksPrecompute<7000>>(input);
-		bench<AdaptiveBlocksPrecompute<8000>>(input);
-		bench<AdaptiveBlocksPrecompute<9000>>(input);
-		bench<AdaptiveBlocksPrecompute<15000>>(input);
-		bench<AdaptiveBlocksPrecompute<20000>>(input);
-		bench<AdaptiveBlocksPrecompute<25000>>(input);
-		bench<AdaptiveBlocksPrecompute<30000>>(input);
-		bench<AdaptiveBlocksPrecompute<40000>>(input);
-		bench<AdaptiveBlocksPrecompute<50000>>(input);
-		bench<AdaptiveBlocksPrecompute<60000>>(input);
-
+		/* 2.5 is the best for SqrtAdaptiveBlocksPrecompute
+		bench<SqrtAdaptiveBlocksPrecompute<25>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<50>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<75>>(input);
 		bench<SqrtAdaptiveBlocksPrecompute<100>>(input);
-				
-		/*
+		bench<SqrtAdaptiveBlocksPrecompute<150>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<200>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<250>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<300>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<350>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<400>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<450>>(input);
+		bench<SqrtAdaptiveBlocksPrecompute<500>>(input);
 		*/
 
 		/*
@@ -1185,6 +1139,8 @@ int main(int argc, char *argv[])
 		bench<Blocks<32>>(input);
 		bench<Blocks<64>>(input);
 		bench<Blocks<128>>(input);
+
+
 		bench<AdaptiveBlocks<100>>(input);
 		bench<AdaptiveBlocks<200>>(input);
 		bench<AdaptiveBlocks<225>>(input);

@@ -106,7 +106,7 @@ plt.close(fig)
 # Plot 4: space-time tradeoff across all ns
 all_ns = sorted(df["n"].unique())
 
-ncols = 5
+ncols = 4
 nrows = -(-len(all_ns) // ncols)
 
 fig, axes = plt.subplots(
