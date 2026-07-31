@@ -9,7 +9,7 @@ os.makedirs("plots", exist_ok=True)
 
 df = pd.read_csv("data.csv")
 
-# Verify all methods produce the same checksum for each n (ignore NaN, e.g. skipped runs)
+
 checksums = df.pivot(index="n", columns="name", values="sum")
 ref = checksums.stack().groupby("n").first()  # first non-NaN per row
 assert (checksums.eq(ref, axis=0) | checksums.isna()).all(
