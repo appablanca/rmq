@@ -131,6 +131,3 @@ Submit a `abcd12.zip` file of this repo named after your student ID. It should c
       Do you think this could be optimized further?
       What (hardware?) limit is the bottleneck?
 
-## AI policy
-Using AI is allowed (but discouraged) for the code.
-Using AI is *not allowed* for the writing of the report.

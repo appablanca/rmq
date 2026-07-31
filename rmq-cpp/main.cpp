@@ -1386,6 +1386,8 @@ int main(int argc, char *argv[])
 
 	for (const auto &input : inputs)
 	{
+		/*
+		*/
 		bench<OnTheFlyNaive>(input);
 		bench<PrecomputedNaive>(input);
 
@@ -1394,11 +1396,10 @@ int main(int argc, char *argv[])
 
 		bench<Blocks<64>>(input);
 
-		bench<SqrtAdaptiveBlocksPrecompute<250>>(input);
 		bench<AdaptiveBlocksPrecompute<20000>>(input);
 
 		bench<Cartesian<8>>(input);
-		bench<AdaptiveCartesian<50>>(input);
+
 
 		/* comparison for caretsian fixed size 8 and adaptive constant 0.5 wins
 		bench<Cartesian<2>>(input);
@@ -1416,6 +1417,8 @@ int main(int argc, char *argv[])
 
 		/* comparrison for the final decision for precompute blocks comparing fixed size - C*log(n) * C*√n
 		2.5*√n wins fixed size is unreliable for adaptive 200 is good
+
+		bench<SqrtAdaptiveBlocksPrecompute<150>>(input);
 		bench<SqrtAdaptiveBlocksPrecompute<200>>(input);
 		bench<SqrtAdaptiveBlocksPrecompute<250>>(input);
 		bench<SqrtAdaptiveBlocksPrecompute<300>>(input);
