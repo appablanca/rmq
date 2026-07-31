@@ -42,7 +42,7 @@ The submission contains the following files:
 All measurements reported here were produced on a single machine:
 
 \begin{description}
-	\item[Machine] Apple Macbook Pro M2 2022
+	\item[Machine] Apple MacBook Pro M2 2022
 	      \begin{itemize}
 		      \item  Apple Silicon M2
 		      \item ARM64/AArch64
@@ -68,7 +68,7 @@ All measurements reported here were produced on a single machine:
 	      \begin{itemize}
 		      \item  Apple Clang 21.0.0
 		      \item  \texttt{-std=c++17 -O3 -march=native -funroll-loops}.
-	      \end{itemize}	      
+	      \end{itemize}
 \end{description}
 
 \clearpage
@@ -77,15 +77,15 @@ All measurements reported here were produced on a single machine:
 	\centering
 	\begin{tabular}{lcc}
 		\hline
-		Algorithm         & Space overhead (bits)                 & Query time                                                       \\
+		Algorithm         & Space overhead (bits)                           & Query time                                                                           \\
 		\hline
-		OnTheFlyNaive     & $O(1)$                                & $O(n)$                                                           \\
-		PrecomputedNaive  & $O(n^2 \log n)$                       & $O(1)$                                                           \\
-		Sparse Table      & $O\!\left(n \log^2 n\right)$          & $O(1)$                                                           \\
-		Segment Tree      & $O(n \log n)$                         & $O(\log n)$                                                      \\
-		Blocks            & $O\!\left(\frac{n}{S}\log^2 n\right)$ & $O(S)$                                                           \\
-		Blocks Precompute & $O\!\left(\frac{n}{S}\log^2 n\right)$ & $O(S)$$^{\ast}$ \\
-			                                                                          Cartesian Trees   & $\tilde{O}(n\ logn)$ & $O(1)$ \\
+		OnTheFlyNaive     & $O(1)$                                          & $O(n)$                                                                               \\
+		PrecomputedNaive  & $O(n^2 \log n)$                                 & $O(1)$                                                                               \\
+		Sparse Table      & $O\!\left(n \log^2 n\right)$                    & $O(1)$                                                                               \\
+		Segment Tree      & $O(n \log n)$                                   & $O(\log n)$                                                                          \\
+		Blocks            & $O\!\left(\frac{n}{S}\log^2 n\right)$           & $O(S)$                                                                               \\
+		Blocks Precompute & $O\!\left(n\log n + \frac{n}{s}\log^2 n\right)$ & $O(S)$$^{\ast}$ \\
+			                                                                                    Cartesian Trees   & $O\!\left(\frac{n}{S}\log^2 n + 4^S S^2 \log S\right)$ & $O(1)$ \\
 		\hline
 	\end{tabular}
 	\caption{Theoretical bounds. All space bounds exclude the input array and
@@ -117,7 +117,7 @@ The table is kept as a single flat \texttt{std::vector<uint32\_t>} of length
 $n(n+1)/2$ rather than as a nested vector of rows: the range $[l,r]$ is mapped to
 the position
 \[
-	l \cdot n - \frac{l(l-1)}{2} + (r-l),
+	l \cdot n - \frac{l(l-1)}{2} + (r-l).
 \]
 
 A query is answered by one lookup into the table followed by one lookup into the
@@ -138,7 +138,7 @@ A query $[l,r]$ selects $\ell = \lfloor \log_2 (r-l+1) \rfloor$ and combines the
 The number of instructions per query is constant, so the query time is $O(1)$.
 
 \subsection{SegmentTree}
-\texttt{SegmentTree} (\texttt{SeTr}) stores, like the Sparse Table, indices of minima rather than the values themselves, but over intervals of powers of 2 instead of all overlapping ones.
+\texttt{SegmentTree} (\texttt{SeTr}) stores, like the Sparse Table, indices of minima rather than the values themselves, but over disjoint intervals instead of all overlapping ones.
 It is kept as a \texttt{std::vector<std::vector<uint32\_t>{}>} with one array per level:
 level $0$ contains the $n$ input positions
 and level $\ell$ contains $\lfloor n/2^\ell \rfloor$ entries,
@@ -181,7 +181,7 @@ Two ways of choosing $S$ are evaluated:
 
 \subsection{BlockSparseTablePrecompute}
 \texttt{BlockSparseTablePrecompute} (\texttt{BlPre}) uses the same block decomposition and the same sparse table over block minima as \texttt{BlockSparseTable},
-and adds two arrays \texttt{prefixMin} and \texttt{suffixMin}, each a \texttt{std::vector<std::vector<uint32\_t>{}>} of length $n$.
+and adds two arrays \texttt{prefixMin} and \texttt{suffixMin}, each a \texttt{std::vector<uint32\_t>} of length $n$.
 For very position $i$, \texttt{prefixMin}$[i]$ is the index of the minimum of the range from the start of $i$'s block up to $i$,
 and \texttt{suffixMin}$[i]$ the index of the minimum from $i$ to the end of its block.
 Both are computed in a single linear pass per block during construction.
@@ -211,6 +211,11 @@ shapes of a block of size $S$ is the Catalan number $C_S = O(4^S)$.
 Rather than building the trees, each block is encoded by a $2S$-bit representations(\texttt{code}).
 For each distinct code, one row of a lookup table is stored, containing the block-local index of the minimum for all $S(S+1)/2$ pairs $(a,b)$ with $a \le b$,
 in the same triangular layout used by \texttt{PrecomputedNaive}.
+Rows are materialised lazily: a \texttt{std::unordered\_map<uint64\_t, uint32\_t>} maps
+each code to the index of its row, and a row is built only when its shape is
+encountered for the first time. The number of rows is therefore bounded by
+$\min\!\left(C_S, \lceil n/S\rceil\right)$ rather than by $C_S$, which keeps the lookup
+table small even when $4^S$ is large compared to $n$.
 
 A query $[l,r]$ with $b_l = b_r$ is answered by a single lookup into the row of block $b_l$.
 Otherwise the suffix of block $b_l$ and the prefix of block $b_r$ are obtained by one lookup each, and the blocks in between by the usual two
@@ -396,7 +401,7 @@ Every method in \hyperref[fig:time]{Figure~\ref*{fig:time}} is flat or near-flat
 Asymptotic complexity is therefore a poor predictor of the measured ranking, since all the $O(1)$ methods perform the same constant number of instructions at every $n$ and differ only in how many of their accesses miss.
 
 
-Further optimisations can be done by using bitpacking for storing the values/indices and possibly utilizing parrellization on the memory accsesses using $SIMD$ like instructions,but the Apple M2 implements NEON without a gather instruction, so it is not available here.
+Further optimisations can be done by using bitpacking for storing the indices and possibly utilizing parrellization on the memory accsesses using $SIMD$ like instructions,but the Apple M2 implements NEON without a gather instruction, so it is not available here.
 
 \begin{figure}[ht]
 	\centering
